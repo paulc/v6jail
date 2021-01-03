@@ -137,6 +137,9 @@ class Host:
         if snapshot:
             self.snapshot_base()
 
+    def list_jails(self):
+        return self.cmd("zfs","list","-r","-H","-o","name,jail:base,jail:name,jail:ipv6","-s","jail:name",self.zroot)
+
     def get_jails(self):
         out = self.cmd("zfs","list","-r","-H","-o","jail:base,jail:name","-s","jail:name",self.zroot)
         return [self.jail(name) for (base,name) in 

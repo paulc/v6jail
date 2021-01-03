@@ -117,12 +117,16 @@ if __name__ == "__main__":
             raise click.ClickException(f"{e}")
 
     @cli.command()
+    @click.option("--detail",is_flag=True)
     @click.pass_context
-    def list(ctx):
+    def list(ctx,detail):
         try:
-            jails = [dict(name=j.name,jname=j.jname,ipv6=j.ipv6,running=j.is_running()) 
-                            for j in ctx.obj["host"].get_jails()]
-            click.echo(tabulate.tabulate(jails,headers="keys"))
+            if detail:
+                jails = [dict(name=j.name,jname=j.jname,ipv6=j.ipv6,running=j.is_running()) 
+                                for j in ctx.obj["host"].get_jails()]
+                click.echo(tabulate.tabulate(jails,headers="keys"))
+            else:
+                click.echo(ctx.obj["host"].list_jails())
         except subprocess.CalledProcessError as e:
             raise click.ClickException(f"{e} :: {e.stderr.strip()}")
         except ValueError as e:
