@@ -185,5 +185,37 @@ if __name__ == "__main__":
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
+    @cli.command()
+    @click.argument("cmds",nargs=-1)
+    @click.option("--snapshot",is_flag=True)
+    @click.pass_context
+    def chroot_base(ctx,snapshot,cmds):
+        try:
+            host  = ctx.obj["host"]
+            host.chroot_base(cmds=cmds,snapshot=snapshot)
+            if snapshot:
+                click.secho(host.get_latest_snapshot(),fg="green")
+        except subprocess.CalledProcessError as e:
+            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+        except ValueError as e:
+            raise click.ClickException(f"{e}")
+
+    @cli.command()
+    @click.pass_context
+    def update_base(ctx):
+        try:
+            host  = ctx.obj["host"]
+            cmds = [ "/usr/sbin/freebsd-update --not-running-from-cron fetch | head",
+                     "/usr/sbin/freebsd-update --not-running-from-cron install || echo No updates available",
+                     "/usr/bin/env ASSUME_ALWAYS_YES=true /usr/sbin/pkg bootstrap",
+                     "/usr/bin/env ASSUME_ALWAYS_YES=true /usr/sbin/pkg update",
+                     "/usr/bin/env ASSUME_ALWAYS_YES=true /usr/sbin/pkg upgrade",
+            ]
+            host.chroot_base(cmds=cmds,snapshot=True)
+            click.secho(host.get_latest_snapshot(),fg="green")
+        except subprocess.CalledProcessError as e:
+            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+        except ValueError as e:
+            raise click.ClickException(f"{e}")
     cli()
 
