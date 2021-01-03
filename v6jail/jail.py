@@ -146,19 +146,21 @@ class Jail:
         fd,path = tempfile.mkstemp(suffix,prefix,jdir,text)
         return (fd, path[len(self.path):])
 
-    def fastboot_script(self,services=None):
+    def fastboot_script(self,services=None,cmds=None):
         epair_host,epair_jail = self.epair
-        services = ";\n".join([f"service {s} start" for s in 
-                            (services or ["syslogd","cron","sshd"])])
+        services = [f"service {s} start" for s in (services or ["syslogd","cron","sshd"])]
+        cmds = cmds or []
+        cmds = ";\n".join([*services,*cmds])
         return f"""
-            ifconfig lo0 inet6 up auto_linklocal;
+            ifconfig lo0 inet 127.0.0.1/8;
+            ifconfig lo0 inet6 ::1 auto_linklocal;
             ifconfig {epair_jail} inet6 {self.ipv6} auto_linklocal;
             route -6 add default fe80::1%{epair_jail};
             route -6 add fe80:: -prefixlen 10 ::1 -reject;
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
             route -6 add ::0.0.0.0 -prefixlen 96 ::1 -reject; 
             route -6 add ff02:: -prefixlen 16 ::1 -reject; 
-            {services}
+            {cmds}
         """
 
     def create_fs(self):
