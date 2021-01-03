@@ -44,8 +44,10 @@ if __name__ == "__main__":
     @click.option("--fastboot",is_flag=True)
     @click.option("--fastboot-service",multiple=True)
     @click.option("--fastboot-cmd",multiple=True)
+    @click.option("--user")
+    @click.option("--pk")
     @click.pass_context
-    def run(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd):
+    def run(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd,user,pk):
         try:
             jail = ctx.obj["host"].jail(name)
             if not jail.check_fs():
@@ -54,6 +56,10 @@ if __name__ == "__main__":
             if fastboot:
                 jail_params["exec.start"] = jail.fastboot_script(services=fastboot_service,
                                                                  cmds=fastboot_cmd)
+            if user:
+                if not pk:
+                    raise ValueError("Must specify --pk with --user")
+                jail.adduser(user=user,pk=pk)
             jail.start(private=private,jail_params=jail_params)
             click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",fg="green")
         except subprocess.CalledProcessError as e:
@@ -168,25 +174,12 @@ if __name__ == "__main__":
 
     @cli.command()
     @click.argument("name",nargs=1)
-    @click.option("--source",type=click.File("rb"),required=True)
-    @click.option("--dest")
-    @click.option("--mktemp",is_flag=True)
-    @click.option("--mode",default="0755")
-    @click.option("--user")
-    @click.option("--group")
+    @click.option("--user",required=True)
+    @click.option("--pk",required=True)
     @click.pass_context
-    def install(ctx,name,source,dest,mktemp,mode,user,group):
+    def adduser(ctx,name,user,pk):
         try:
-            jail = ctx.obj["host"].jail(name)
-            if dest:
-                n = jail.install(source,dest,mode,user,group)
-                click.secho(f"Installed to {dest} ({n} bytes)")
-            elif mktemp:
-                fd,path = jail.mkstemp(prefix="tmp_")
-                n = jail.install(source,fd)
-                click.secho(f"Installed to {path} ({n} bytes)")
-            else:
-                raise ValueError("Must specify either `--dest` or `--mktemp`")
+            ctx.obj["host"].jail(name).adduser(user=user,pk=pk)
         except subprocess.CalledProcessError as e:
             raise click.ClickException(f"{e} :: {e.stderr.strip()}")
         except ValueError as e:

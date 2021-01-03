@@ -51,6 +51,8 @@ class Jail:
         self.zfs_clone      = lambda *args: self.host.cmd("zfs","clone",*args)
         self.zfs_set        = lambda *args: self.host.cmd("zfs","set",*args,self.zpath)
         self.jail_start     = lambda *args: self.host.cmd("jail","-cv",*args)
+        self.useradd        = lambda user:  self.host.cmd("pw","-R",self.path,"useradd","-n",user,"-m","-s","/bin/sh","-h","-")
+        self.usershow       = lambda user:  self.host.cmd("pw","-R",self.path,"usershow","-n",user).split(":")
         self.jail_stop      = lambda : self.host.cmd("jail","-Rv",self.jname)
         self.umount_devfs   = lambda : self.host.cmd("umount",f"{self.path}/dev")
         self.osrelease      = lambda : self.host.cmd("uname","-r")
@@ -145,6 +147,16 @@ class Jail:
         jdir = f"{self.path}/{dir}" if dir else f"{self.path}/tmp"
         fd,path = tempfile.mkstemp(suffix,prefix,jdir,text)
         return (fd, path[len(self.path):])
+
+    @check_fs_exists
+    def adduser(self,user,pk):
+        self.useradd(user)
+        (name,_,uid,gid,*_) = self.usershow(user)
+        os.mkdir(f"{self.path}/home/{user}/.ssh",mode=0o700)
+        with open(f"{self.path}/home/{user}/.ssh/authorized_keys","w") as f:
+            f.write(pk)
+        os.chown(f"{self.path}/home/{user}/.ssh",int(uid),int(gid))
+        os.chown(f"{self.path}/home/{user}/.ssh/authorized_keys",int(uid),int(gid))
 
     def fastboot_script(self,services=None,cmds=None):
         epair_host,epair_jail = self.epair
