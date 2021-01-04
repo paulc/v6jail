@@ -45,17 +45,20 @@ class Jail:
         self.gateway = self.host.generate_gateway(self.epair[JAIL])
 
         # Useful commands
-        self.ifconfig       = lambda *args: self.host.cmd("ifconfig",*args)
-        self.route6         = lambda *args: self.host.cmd("route","-6",*args)
-        self.jail_route6    = lambda *args: self.host.cmd("jexec","-l",self.jname,"route","-6",*args)
-        self.zfs_clone      = lambda *args: self.host.cmd("zfs","clone",*args)
-        self.zfs_set        = lambda *args: self.host.cmd("zfs","set",*args,self.zpath)
-        self.jail_start     = lambda *args: self.host.cmd("jail","-cv",*args)
-        self.useradd        = lambda user:  self.host.cmd("pw","-R",self.path,"useradd","-n",user,"-m","-s","/bin/sh","-h","-")
-        self.usershow       = lambda user:  self.host.cmd("pw","-R",self.path,"usershow","-n",user).split(":")
-        self.jail_stop      = lambda : self.host.cmd("jail","-Rv",self.jname)
-        self.umount_devfs   = lambda : self.host.cmd("umount",f"{self.path}/dev")
-        self.osrelease      = lambda : self.host.cmd("uname","-r")
+        self.ifconfig       = lambda *args: self.host.cmd("/sbin/ifconfig",*args)
+        self.route6         = lambda *args: self.host.cmd("/sbin/route","-6",*args)
+        self.jail_route6    = lambda *args: self.host.cmd("/usr/sbin/jexec",
+                                                "-l",self.jname,"/sbin/route","-6",*args)
+        self.zfs_clone      = lambda *args: self.host.cmd("/sbin/zfs","clone",*args)
+        self.zfs_set        = lambda *args: self.host.cmd("/sbin/zfs","set",*args,self.zpath)
+        self.jail_start     = lambda *args: self.host.cmd("/usr/sbin/jail","-cv",*args)
+        self.useradd        = lambda user:  self.host.cmd("/usr/sbin/pw","-R",self.path,
+                                                "useradd","-n",user,"-m","-s","/bin/sh","-h","-")
+        self.usershow       = lambda user:  self.host.cmd("/usr/sbin/pw","-R",self.path,
+                                                "usershow","-n",user).split(":")
+        self.jail_stop      = lambda : self.host.cmd("/usr/sbin/jail","-Rv",self.jname)
+        self.umount_devfs   = lambda : self.host.cmd("/sbin/umount",f"{self.path}/dev")
+        self.osrelease      = lambda : self.host.cmd("/usr/bin/uname","-r")
 
     def create_epair(self,private=True):
         if self.check_epair():
@@ -102,17 +105,17 @@ class Jail:
 
     def is_vnet(self):
         try:
-            return self.host.cmd("jls","-j",self.jname,"vnet") == "1"
+            return self.host.cmd("/usr/sbin/jls","-j",self.jname,"vnet") == "1"
         except subprocess.CalledProcessError:
             return False
 
     @check_running
     def jexec(self,*args):
-        return subprocess.run(["jexec","-l",self.jname,*args])
+        return subprocess.run(["/usr/sbin/jexec","-l",self.jname,*args])
 
     @check_fs_exists
     def sysrc(self,*args):
-        return self.host.cmd("sysrc","-R",self.path,*args)
+        return self.host.cmd("/usr/sbin/sysrc","-R",self.path,*args)
 
     @check_fs_exists
     def install(self,source,dest,mode="0755",user=None,group=None):
@@ -203,7 +206,7 @@ class Jail:
         params.update(jail_params or {})
         self.create_epair(private)
         self.configure_vnet()
-        self.jail_start(*[f"{k}={v}" for k,v in params.items()])
+        subprocess.run(["/usr/sbin/jail","-cv",*[f"{k}={v}" for k,v in params.items()]])
         self.local_route()
 
     @check_running
@@ -215,7 +218,7 @@ class Jail:
 
     @check_fs_exists
     def destroy_fs(self):
-        self.host.cmd("zfs","destroy","-f",self.zpath)
+        self.host.cmd("/sbin/zfs","destroy","-f",self.zpath)
 
     def remove(self,force=False):
         if self.is_running():
