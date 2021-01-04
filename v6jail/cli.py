@@ -44,24 +44,24 @@ if __name__ == "__main__":
     @click.option("--fastboot",is_flag=True)
     @click.option("--fastboot-service",multiple=True)
     @click.option("--fastboot-cmd",multiple=True)
-    @click.option("--user")
-    @click.option("--pk")
+    @click.option("--adduser",nargs=2,multiple=True)
     @click.pass_context
-    def run(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd,user,pk):
+    def run(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd,adduser):
         try:
             jail = ctx.obj["host"].jail(name)
             if not jail.check_fs():
                 jail.create_fs()
+            if jail.is_running():
+                raise click.UsageError(f"Jail {name} running")
             jail_params = dict([p.split("=") for p in params])
             if fastboot:
                 jail_params["exec.start"] = jail.fastboot_script(services=fastboot_service,
                                                                  cmds=fastboot_cmd)
-            if user:
-                if not pk:
-                    raise ValueError("Must specify --pk with --user")
+            for (user,pk) in adduser:
                 jail.adduser(user=user,pk=pk)
             jail.start(private=private,jail_params=jail_params)
-            click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",fg="green")
+            click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",
+                        fg="green")
         except subprocess.CalledProcessError as e:
             raise click.ClickException(f"{e} :: {e.stderr.strip()}")
         except ValueError as e:
@@ -117,16 +117,12 @@ if __name__ == "__main__":
             raise click.ClickException(f"{e}")
 
     @cli.command()
-    @click.option("--detail",is_flag=True)
+    @click.option("--status",is_flag=True)
     @click.pass_context
-    def list(ctx,detail):
+    def list(ctx,status):
         try:
-            if detail:
-                jails = [dict(name=j.name,jname=j.jname,ipv6=j.ipv6,running=j.is_running()) 
-                                for j in ctx.obj["host"].get_jails()]
-                click.echo(tabulate.tabulate(jails,headers="keys"))
-            else:
-                click.echo(ctx.obj["host"].list_jails())
+            jails = ctx.obj["host"].list_jails(status=status)
+            click.echo(tabulate.tabulate(jails,headers="keys"))
         except subprocess.CalledProcessError as e:
             raise click.ClickException(f"{e} :: {e.stderr.strip()}")
         except ValueError as e:

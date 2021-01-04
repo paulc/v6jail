@@ -1,5 +1,5 @@
 
-import base64,hashlib,ipaddress,re,struct,subprocess,time
+import base64,hashlib,ipaddress,re,os.path,struct,subprocess,time
 
 from .jail import Jail
 
@@ -138,15 +138,23 @@ class Host:
         if snapshot:
             self.snapshot_base()
 
-    def list_jails(self):
-        return self.cmd("/sbin/zfs","list","-r","-H","-o","name,jail:base,jail:name,jail:ipv6",
-                    "-s","jail:name",self.zroot)
-
-    def get_jails(self):
-        out = self.cmd("/sbin/zfs","list","-r","-H","-o","jail:base,jail:name",
+    def list_jails(self,status=False):
+        out = self.cmd("/sbin/zfs","list","-r","-H","-o","name,jail:name,jail:base,jail:ipv6",
                     "-s","jail:name", self.zroot)
-        return [self.jail(name) for (base,name) in 
-                        re.findall("(.*)\t(.*)",out) if base == self.base]
+        jails = re.findall("(.*)\t(.*)\t(.*)\t(.*)",out)
+        if status:
+            return [dict(name=name,
+                         base=base,
+                         volume=os.path.basename(vol),
+                         ipv6=ipv6,
+                         running=self.check_cmd("jls","-Nj","j_"+os.path.basename(vol)))
+                    for (vol,name,base,ipv6) in jails if base != "-"]
+        else:
+            return [dict(name=name,
+                         base=base,
+                         volume=os.path.basename(vol),
+                         ipv6=ipv6)
+                    for (vol,name,base,ipv6) in jails if base != "-"]
 
     def jail(self,name):
         return Jail(name,self)
