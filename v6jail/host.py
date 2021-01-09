@@ -146,6 +146,7 @@ class Host:
             return [dict(name=name,
                          base=base,
                          volume=os.path.basename(vol),
+                         jid=f"j_{os.path.basename(vol)}",
                          ipv6=ipv6,
                          running=self.check_cmd("jls","-Nj","j_"+os.path.basename(vol)))
                     for (vol,name,base,ipv6) in jails if base != "-"]
@@ -153,6 +154,7 @@ class Host:
             return [dict(name=name,
                          base=base,
                          volume=os.path.basename(vol),
+                         jid=f"j_{os.path.basename(vol)}",
                          ipv6=ipv6)
                     for (vol,name,base,ipv6) in jails if base != "-"]
 
