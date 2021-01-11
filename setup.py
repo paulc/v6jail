@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='v6jail',
-      version = '1.0',
+      version = '1.1',
       description = 'FreeBSD IPv6 Jail Management Utility',
       url = 'https://github.com/paulc/v6jail',
       packages = ['v6jail'],
