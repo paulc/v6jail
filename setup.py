@@ -2,9 +2,13 @@
 
 from setuptools import setup
 
+with open("requirements.txt") as f:
+    install_requires = f.read().splitlines()
+
 setup(name='v6jail',
-      version = '1.1',
+      version = '1.2',
       description = 'FreeBSD IPv6 Jail Management Utility',
+      install_requires = install_requires,
       url = 'https://github.com/paulc/v6jail',
       packages = ['v6jail'],
       license = 'BSD',
