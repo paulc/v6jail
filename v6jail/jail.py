@@ -59,6 +59,8 @@ class Jail:
         self.jail_stop      = lambda : self.host.cmd("/usr/sbin/jail","-Rv",self.jname)
         self.umount_devfs   = lambda : self.host.cmd("/sbin/umount",f"{self.path}/dev")
         self.osrelease      = lambda : self.host.cmd("/usr/bin/uname","-r")
+        self.mounted_fs     = lambda : self.host.cmd("/sbin/mount")
+        self.umount_fs      = lambda args : self.host.cmd("/sbin/mount","-f",*args)
 
     def create_epair(self,private=True):
         if self.check_epair():
@@ -75,6 +77,16 @@ class Jail:
 
     def remove_vnet(self):
         self.ifconfig(self.epair[JAIL],"-vnet",self.jname)
+
+    def umount_local(self):
+        if os.path.exists(f"{self.path}/etc/fstab"):
+            self.jexec("umount","-af")
+
+    def force_umount(self):
+        fs = re.findall(f".* on ({self.path}/.*) \(.*\)",self.mounted_fs())
+        if fs:
+            self.umount_fs(fs)
+
 
     def destroy_epair(self):
         self.ifconfig(self.epair[HOST],"destroy")
@@ -153,13 +165,21 @@ class Jail:
 
     @check_fs_exists
     def adduser(self,user,pk):
-        self.useradd(user)
-        (name,_,uid,gid,*_) = self.usershow(user)
-        os.mkdir(f"{self.path}/home/{user}/.ssh",mode=0o700)
-        with open(f"{self.path}/home/{user}/.ssh/authorized_keys","w") as f:
-            f.write(pk)
-        os.chown(f"{self.path}/home/{user}/.ssh",int(uid),int(gid))
-        os.chown(f"{self.path}/home/{user}/.ssh/authorized_keys",int(uid),int(gid))
+        if user == "root":
+            # Just add ssh key
+            os.mkdir(f"{self.path}/root/.ssh",mode=0o700)
+            with open(f"{self.path}/root/.ssh/authorized_keys","a") as f:
+                f.write(f"\n{pk}\n")
+            os.chmod(f"{self.path}/root/.ssh/authorized_keys",0o600)
+        else:
+            self.useradd(user)
+            (name,_,uid,gid,*_) = self.usershow(user)
+            os.mkdir(f"{self.path}/home/{user}/.ssh",mode=0o700)
+            with open(f"{self.path}/home/{user}/.ssh/authorized_keys","a") as f:
+                f.write(f"\n{pk}\n")
+            os.chown(f"{self.path}/home/{user}/.ssh",int(uid),int(gid))
+            os.chown(f"{self.path}/home/{user}/.ssh/authorized_keys",int(uid),int(gid))
+            os.chmod(f"{self.path}/home/{user}/.ssh/authorized_keys",0o600)
 
     def fastboot_script(self,services=None,cmds=None):
         epair_host,epair_jail = self.epair
@@ -175,6 +195,7 @@ class Jail:
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
             route -6 add ::0.0.0.0 -prefixlen 96 ::1 -reject; 
             route -6 add ff02:: -prefixlen 16 ::1 -reject; 
+            [ -f /etc/fstab ] && mount -al;
             {cmds}
         """
 
@@ -196,8 +217,11 @@ class Jail:
 
     @check_fs_exists
     @check_not_running
-    def start(self,private=True,jail_params=None):
-        params = self.host.DEFAULT_PARAMS.copy()
+    def start(self,private=True,jail_params=None,param_set=None):
+        if param_set:
+            params = param_set.copy()
+        else:
+            params = self.host.DEFAULT_PARAMS.copy()
         params["name"] = self.jname
         params["path"] = self.path
         params["vnet.interface"] = self.epair[JAIL]
@@ -206,15 +230,18 @@ class Jail:
         params.update(jail_params or {})
         self.create_epair(private)
         self.configure_vnet()
-        subprocess.run(["/usr/sbin/jail","-cv",*[f"{k}={v}" for k,v in params.items()]])
+        subprocess.run(["/usr/sbin/jail","-cv",*[f"{k}={v}" for k,v in params.items()]],
+                       capture_output=True, check=True)
         self.local_route()
 
     @check_running
     def stop(self):
+        self.umount_local()
         self.remove_vnet()
         self.destroy_epair()
         self.jail_stop()
         self.umount_devfs()
+        self.force_umount()
 
     @check_fs_exists
     def destroy_fs(self):

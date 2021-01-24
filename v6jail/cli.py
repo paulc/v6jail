@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
-import code,subprocess
+import code,shlex,subprocess
 import click,tabulate
 
 from .host import Host
 from .jail import Jail
 
 if __name__ == "__main__":
+
+    proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
 
     @click.group()
     @click.option("--debug",is_flag=True)
@@ -20,7 +22,7 @@ if __name__ == "__main__":
                 args["base"] = base
             ctx.obj["host"] = Host(**args)
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -33,7 +35,7 @@ if __name__ == "__main__":
             jail.create_fs()
             click.secho(f"Created jail: {jail.name} (id={jail.jname})",fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -41,12 +43,15 @@ if __name__ == "__main__":
     @click.argument("name",nargs=1)
     @click.option("--private",is_flag=True)
     @click.option("--params",multiple=True)
+    @click.option("--linux",is_flag=True)
+    @click.option("--shell",is_flag=True)
+    @click.option("--jexec")
     @click.option("--fastboot",is_flag=True)
     @click.option("--fastboot-service",multiple=True)
     @click.option("--fastboot-cmd",multiple=True)
     @click.option("--adduser",nargs=2,multiple=True)
     @click.pass_context
-    def run(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd,adduser):
+    def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,adduser,shell,jexec):
         try:
             jail = ctx.obj["host"].jail(name)
             if not jail.check_fs():
@@ -59,33 +64,44 @@ if __name__ == "__main__":
                                                                  cmds=fastboot_cmd)
             for (user,pk) in adduser:
                 jail.adduser(user=user,pk=pk)
-            jail.start(private=private,jail_params=jail_params)
+            if linux:
+                jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
+            else:
+                jail.start(private=private,jail_params=jail_params)
             click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",
                         fg="green")
+            if jexec:
+                jail.jexec(*shlex.split(jexec))
+            if shell:
+                jail.jexec('login','-f','root')
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
     @cli.command()
     @click.argument("name",nargs=1)
     @click.option("--params",multiple=True)
+    @click.option("--linux",is_flag=True)
     @click.option("--private",is_flag=True)
     @click.option("--fastboot",is_flag=True)
     @click.option("--fastboot-service",multiple=True)
     @click.option("--fastboot-cmd",multiple=True)
     @click.pass_context
-    def start(ctx,name,private,params,fastboot,fastboot_service,fastboot_cmd):
+    def start(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd):
         try:
             jail = ctx.obj["host"].jail(name)
             jail_params = dict([p.split("=") for p in params])
             if fastboot:
                 jail_params["exec.start"] = jail.fastboot_script(services=fastboot_service,
                                                                  cmds=fastboot_cmd)
-            jail.start(private=private,jail_params=jail_params)
+            if linux:
+                jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
+            else:
+                jail.start(private=private,jail_params=jail_params)
             click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -98,7 +114,7 @@ if __name__ == "__main__":
             jail.stop()
             click.secho(f"Stopped jail: {jail.name} ({jail.jname})",fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -112,7 +128,7 @@ if __name__ == "__main__":
             jail.remove(force=force)
             click.secho(f"Removed jail: {jail.name} ({jail.jname})",fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -124,7 +140,7 @@ if __name__ == "__main__":
             jails = ctx.obj["host"].list_jails(status=status)
             click.echo(tabulate.tabulate(jails,headers="keys"))
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -141,7 +157,7 @@ if __name__ == "__main__":
             else:
                 click.secho(jail.sysrc("-a","-v"),fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -154,7 +170,7 @@ if __name__ == "__main__":
             jail = ctx.obj["host"].jail(name)
             jail.jexec(*args)
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -168,7 +184,7 @@ if __name__ == "__main__":
             host = ctx.obj["host"]
             code.interact(local=locals())
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -181,7 +197,7 @@ if __name__ == "__main__":
         try:
             ctx.obj["host"].jail(name).adduser(user=user,pk=pk)
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -196,7 +212,7 @@ if __name__ == "__main__":
             if snapshot:
                 click.secho(host.get_latest_snapshot(),fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
 
@@ -214,7 +230,7 @@ if __name__ == "__main__":
             host.chroot_base(cmds=cmds,snapshot=True)
             click.secho(host.get_latest_snapshot(),fg="green")
         except subprocess.CalledProcessError as e:
-            raise click.ClickException(f"{e} :: {e.stderr.strip()}")
+            raise click.ClickException(f"{e} :: {proc_err(e)}")
         except ValueError as e:
             raise click.ClickException(f"{e}")
     cli()

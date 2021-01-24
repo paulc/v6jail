@@ -25,9 +25,39 @@ class Host:
             "exec.start":           "/bin/sh /etc/rc",
     }
 
+    LINUX_PARAMS = {
+            "allow.set_hostname":   False,
+            "allow.raw_sockets":    True,
+            "allow.socket_af":      True,
+            "allow.sysvipc":        True,
+            "allow.chflags":        True,
+            "mount.devfs":          True,
+            "devfs_ruleset":        4,
+            "enforce_statfs":       2,
+            "sysvmsg":              "new",
+            "sysvsem":              "new",
+            "sysvshm":              "new",
+            "children.max":         0,
+            "osrelease":            "",
+            "vnet":                 "new",
+            "vnet.interface":       "",
+            "persist":              True,
+            "exec.start":           "/bin/sh /etc/rc",
+            # Needed for Linux emulation
+            "devfs_ruleset":        20,
+            "enforce_statfs":       1,
+            "allow.mount":          True,
+            "allow.mount.devfs":    True,
+            "allow.mount.fdescfs":  True,
+            "allow.mount.linprocfs":True,
+            "allow.mount.linsysfs": True,
+            "allow.mount.tmpfs":    True,
+            "allow.mount.nullfs":   True,
+    }
+
     def __init__(self,hostif=None,hostipv6=None,prefix=None,gateway=None,
                     base="base",zroot="zroot/jail",bridge="bridge0",salt=b'',debug=False):
-        self.debug = debug
+        self.debug = False  # Dont show debug output for setup
         self.zroot = zroot
         self.bridge = bridge
         self.base = base
@@ -43,6 +73,8 @@ class Host:
 
         if not self.check_cmd("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
+
+        self.debug = debug
 
     def cmd(self,*args):
         try:
