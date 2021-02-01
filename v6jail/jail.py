@@ -231,7 +231,7 @@ class Jail:
         self.create_epair(private)
         self.configure_vnet()
         subprocess.run(["/usr/sbin/jail","-cv",*[f"{k}={v}" for k,v in params.items()]],
-                       capture_output=True, check=True)
+                       check=True)
         self.local_route()
 
     @check_running
