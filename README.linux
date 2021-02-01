@@ -1,0 +1,45 @@
+
+# Host config
+
+sysrc linux_enable=YES
+sysrc linux_mounts_enable="NO"
+service linux start
+
+# Configure linux base
+
+LATEST_SNAPSHOT=$(zfs list -Hrt snap -o name -s creation zroot/jail/base | tail -1)
+
+zfs send ${LATEST_SNAPSHOT} | zfs recv -v zroot/jail/linux
+
+python3 -mv6jail.cli --base linux chroot-base --snapshot <<EOM
+
+tee /etc/fstab <<__FSTAB
+devfs           /compat/ubuntu/dev      devfs           rw,late                      0       0
+tmpfs           /compat/ubuntu/dev/shm  tmpfs           rw,late,size=1g,mode=1777    0       0
+fdescfs         /compat/ubuntu/dev/fd   fdescfs         rw,late,linrdlnk             0       0
+linprocfs       /compat/ubuntu/proc     linprocfs       rw,late                      0       0
+linsysfs        /compat/ubuntu/sys      linsysfs        rw,late                      0       0
+/tmp            /compat/ubuntu/tmp      nullfs          rw,late                      0       0
+/home           /compat/ubuntu/home     nullfs          rw,late                      0       0
+__FSTAB
+
+mkdir /home 
+mkdir -p /compat/ubuntu/dev /compat/ubuntu/dev/shm /compat/ubuntu/dev/fd 
+mkdir -p /compat/ubuntu/proc /compat/ubuntu/sys /compat/ubuntu/tmp /compat/ubuntu/home
+mount -al
+
+pkg install -y debootstrap
+
+debootstrap --no-check-gpg bionic /compat/ubuntu
+echo "APT::Cache-Start 251658240;" | tee /compat/ubuntu/etc/apt/apt.conf.d/00aptitude
+
+chroot /compat/ubuntu /usr/bin/apt update
+chroot /compat/ubuntu /usr/bin/apt install -y openssh-server
+chroot /compat/ubuntu /usr/bin/apt remove -y rsyslog
+
+sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
+
+umount -a
+
+EOM
+
