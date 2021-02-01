@@ -39,6 +39,12 @@ chroot /compat/ubuntu /usr/bin/apt remove -y rsyslog
 
 sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
 
+# USER=<user>
+# useradd --create-home ${USER}
+# (umask 077; mkdir /home/${USER}/.ssh; head -1 | tee /home/${USER}/.ssh/authorized_keys)
+# chown -R ${USER}:${USER} /home/${USER}
+# service ssh start
+
 umount -a
 
 EOM
