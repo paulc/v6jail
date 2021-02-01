@@ -167,14 +167,20 @@ class Jail:
     def adduser(self,user,pk):
         if user == "root":
             # Just add ssh key
-            os.mkdir(f"{self.path}/root/.ssh",mode=0o700)
+            try:
+                os.mkdir(f"{self.path}/root/.ssh",mode=0o700)
+            except FileExistsError:
+                pass
             with open(f"{self.path}/root/.ssh/authorized_keys","a") as f:
                 f.write(f"\n{pk}\n")
             os.chmod(f"{self.path}/root/.ssh/authorized_keys",0o600)
         else:
             self.useradd(user)
             (name,_,uid,gid,*_) = self.usershow(user)
-            os.mkdir(f"{self.path}/home/{user}/.ssh",mode=0o700)
+            try:
+                os.mkdir(f"{self.path}/home/{user}/.ssh",mode=0o700)
+            except FileExistsError:
+                pass
             with open(f"{self.path}/home/{user}/.ssh/authorized_keys","a") as f:
                 f.write(f"\n{pk}\n")
             os.chown(f"{self.path}/home/{user}/.ssh",int(uid),int(gid))
