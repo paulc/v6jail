@@ -193,8 +193,7 @@ class Jail:
         cmds = cmds or []
         cmds = ";\n".join([*services,*cmds])
         return f"""
-            ifconfig lo0 inet 127.0.0.1/8;
-            ifconfig lo0 inet6 ::1 auto_linklocal;
+            ifconfig lo0 inet6 up;
             ifconfig {epair_jail} inet6 {self.ipv6} auto_linklocal;
             route -6 add default fe80::1%{epair_jail};
             route -6 add fe80:: -prefixlen 10 ::1 -reject;
@@ -219,6 +218,7 @@ class Jail:
         self.sysrc(f"network_interfaces=lo0 {epair_jail}",
                    f"ifconfig_{epair_jail}_ipv6=inet6 {self.ipv6}/64",
                    f"ipv6_defaultrouter={self.gateway}",
+                   f"ifconfig_lo0=up",
                    f"ifconfig_lo0_ipv6=inet6 up")
 
     @check_fs_exists
