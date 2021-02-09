@@ -1,6 +1,7 @@
 
 import binascii,configparser,ipaddress,re,sys
-from dataclasses import dataclass,field,asdict
+from dataclasses import dataclass,field,fields,asdict
+from enum import Enum
 
 from .util import Command
 
@@ -21,35 +22,19 @@ def host_gateway():
                            cmd('/sbin/route','-6','get','default')).groups()
     return gateway
 
-DEFAULT_PARAMS = {
-        "allow.set_hostname":   False,
-        "allow.raw_sockets":    True,
-        "allow.socket_af":      True,
-        "allow.sysvipc":        True,
-        "allow.chflags":        True,
-        "mount.devfs":          True,
-        "devfs_ruleset":        4,
-        "enforce_statfs":       2,
-        "sysvmsg":              "new",
-        "sysvsem":              "new",
-        "sysvshm":              "new",
-        "children.max":         0,
-        "osrelease":            "",
-        "vnet":                 "new",
-        "vnet.interface":       "",
-        "persist":              True,
-        "exec.start":           "/bin/sh /etc/rc",
-}
+Mode = Enum('Mode','BRIDGED ROUTED')
 
 @dataclass
-class Config:
+class HostConfig:
 
     zroot:          str = 'zroot/jail'
+    mode:           Mode = Mode.BRIDGED
     bridge:         str = 'bridge0'
     hostif:         str = field(default_factory=host_default_if)
     gateway:        str = field(default_factory=host_gateway)
     hostipv6:       str = None
     prefix:         str = None
+    vnet:           bool = True
 
     base:           str = 'base'
     mountpoint:     str = 'zroot/jail'
@@ -66,20 +51,46 @@ class Config:
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
 
-    def write_ini(self,f=sys.stdout):
-        c = configparser.ConfigParser(interpolation=None)
-        c['v6jail'] = asdict(self)
-        # Fix bytes value for salt
-        c['v6jail']['salt'] = binascii.hexlify(self.salt).decode('ascii')
+    def _encode(self,field):
+        if field.type in [str,int,bool]:
+            return str(getattr(self,field.name))
+        elif field.type is Mode:
+            return getattr(self,field.name).name
+        elif field.type is bytes:
+            return binascii.hexlify(getattr(self,field.name)).decode('ascii')
+        else:
+            raise ValueError("Invalid field type:", field) 
+
+    def write_config(self,c=None,f=sys.stdout):
+        c = c or configparser.ConfigParser(interpolation=None)
+        c['v6jail.host'] = { f.name:self._encode(f) for f in fields(self) }
         c.write(f)
+        return c
 
     @classmethod
-    def read_ini(cls,f):
-        c = configparser.ConfigParser(interpolation=None)
-        c.read_file(f)
-        p = dict(c['v6jail'])
-        # Fix bytes value for salt
-        if 'salt' in p:
-            p['salt'] = binascii.unhexlify(p['salt'])
-        return cls(**p)
+    def read_config(cls,c=None,f=None):
+        if c is None:
+            c = configparser.ConfigParser(interpolation=None)
+            c.read_file(f)
+        params = dict(c['v6jail.host'])
+        field_types = { f.name:f for f in fields(cls) }
+        for k,v in params.items():
+            f = field_types[k]
+            if f.type is str:
+                pass
+            elif f.type is int:
+                params[k] = int(v)
+            elif f.type is bytes:
+                params[k] = binascii.unhexlify(v)
+            elif f.type is bool:
+                params[k] = (v.lower() == 'true')
+            elif f.type is Mode:
+                params[k] = Mode[v]
+            else:
+                raise ValueError("Unsupported type:",f)
+        return cls(**params)
 
+if __name__ == '__main__':
+
+    c = HostConfig()
+    c.write_config()
