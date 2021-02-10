@@ -1,6 +1,7 @@
 
 import binascii,configparser,ipaddress,re,sys
 from dataclasses import dataclass,field,fields,asdict
+from datetime import datetime
 from enum import Enum
 
 from .util import Command
@@ -24,8 +25,61 @@ def host_gateway():
 
 Mode = Enum('Mode','BRIDGED ROUTED')
 
+class IniEncoderMixin:
+
+    """
+        Mixin for dataclass which supports automatic encoding/decoding
+        to/from INI file using type hints from dataclass fields
+    """
+
+    def _encode(self,field):
+        if field.type in [str,int,float,bool]:
+            return str(getattr(self,field.name))
+        elif field.type is bytes:
+            return binascii.hexlify(getattr(self,field.name)).decode('ascii')
+        elif field.type is datetime:
+            return getattr(self,field.name).isoformat()
+        elif issubclass(field.type,Enum):
+            return getattr(self,field.name).name
+        else:
+            raise ValueError("Invalid field type:", field) 
+
+    def _decode(self,field,value):
+        if field.type in (str,int,float):
+            return field.type(value)
+        elif field.type is bool:
+            return (value.lower() == 'true')
+        elif field.type is bytes:
+            return binascii.unhexlify(value)
+        elif field.type is datetime:
+            return datetime.fromisoformat(value)
+        elif issubclass(field.type,Enum):
+            return field.type[value]
+        else:
+            raise ValueError("Unsupported type:",field)
+
+    def write_config(self,section,c=None,f=None):
+        if all([c,f]) or not any([c,f]):
+            raise TypeError("Must specify either c:ConfigParser or f:typing.TextIO")
+        c = c or configparser.ConfigParser(interpolation=None)
+        c[section] = { f.name:self._encode(f) for f in fields(self) }
+        if f:
+            c.write(f)
+        return c
+
+    @classmethod
+    def read_config(cls,section,c=None,f=None):
+        if all([c,f]) or not any([c,f]):
+            raise TypeError("Must specify either c:ConfigParser or f:typing.TextIO")
+        if c is None:
+            c = configparser.ConfigParser(interpolation=None)
+            c.read_file(f)
+        params = dict(c[section])
+        fieldmap = { f.name:f for f in fields(cls) }
+        return cls(**{k:cls._decode(cls,fieldmap[k],v) for k,v in params.items()})
+
 @dataclass
-class HostConfig:
+class HostConfig(IniEncoderMixin):
 
     zroot:          str = 'zroot/jail'
     mode:           Mode = Mode.BRIDGED
@@ -51,44 +105,6 @@ class HostConfig:
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
 
-    def _encode(self,field):
-        if field.type in [str,int,bool]:
-            return str(getattr(self,field.name))
-        elif field.type is Mode:
-            return getattr(self,field.name).name
-        elif field.type is bytes:
-            return binascii.hexlify(getattr(self,field.name)).decode('ascii')
-        else:
-            raise ValueError("Invalid field type:", field) 
-
-    def write_config(self,c=None,f=sys.stdout):
-        c = c or configparser.ConfigParser(interpolation=None)
-        c['v6jail.host'] = { f.name:self._encode(f) for f in fields(self) }
-        c.write(f)
-        return c
-
-    @classmethod
-    def read_config(cls,c=None,f=None):
-        if c is None:
-            c = configparser.ConfigParser(interpolation=None)
-            c.read_file(f)
-        params = dict(c['v6jail.host'])
-        field_types = { f.name:f for f in fields(cls) }
-        for k,v in params.items():
-            f = field_types[k]
-            if f.type is str:
-                pass
-            elif f.type is int:
-                params[k] = int(v)
-            elif f.type is bytes:
-                params[k] = binascii.unhexlify(v)
-            elif f.type is bool:
-                params[k] = (v.lower() == 'true')
-            elif f.type is Mode:
-                params[k] = Mode[v]
-            else:
-                raise ValueError("Unsupported type:",f)
-        return cls(**params)
 
 if __name__ == '__main__':
 
