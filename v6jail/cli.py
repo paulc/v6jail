@@ -232,7 +232,6 @@ def update_base(ctx):
     except ValueError as e:
         raise click.ClickException(f"{e}")
 
-
 if __name__ == "__main__":
     cli()
 
