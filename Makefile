@@ -1,5 +1,5 @@
 
-SOURCES = v6jail/__init__.py v6jail/cli.py v6jail/config.py v6jail/host.py v6jail/jail.py v6jail/util.py
+SOURCES := $(wildcard setup.py v6jail/*.py)
 
 .PHONY: shiv
 shiv: bin/v6
