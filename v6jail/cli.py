@@ -66,6 +66,17 @@ def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,add
             jail.adduser(user=user,pk=pk)
         if linux:
             jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
+            # Sync linux users
+            for (user,_) in adduser:
+                if user != "root":
+                    uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()
+                    jail.jexec("chroot","/compat/ubuntu",
+                               "/usr/sbin/useradd","--uid",uid,"--user-group","--groups","sudo","--shell","/bin/bash",user)
+            # Start SSHD
+            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ed25519","-f","/etc/ssh/ssh_host_ed25519_key","-N","")
+            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ecdsa","-f","/etc/ssh/ssh_host_ecdsa_key","-N","")
+            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","rsa","-f","/etc/ssh/ssh_host_rsa_key","-N","")
+            jail.jexec("chroot","/compat/ubuntu","/usr/sbin/service","ssh","start")
         else:
             jail.start(private=private,jail_params=jail_params)
         click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.ipv6})",
@@ -73,7 +84,20 @@ def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,add
         if jexec:
             jail.jexec(*shlex.split(jexec))
         if shell:
-            jail.jexec('login','-f','root')
+            jail.jexec("login","-f","root")
+    except subprocess.CalledProcessError as e:
+        raise click.ClickException(f"{e} :: {proc_err(e)}")
+    except ValueError as e:
+        raise click.ClickException(f"{e}")
+
+@cli.command()
+@click.argument("name",nargs=1)
+@click.option("--user",required=True)
+@click.option("--pk",required=True)
+@click.pass_context
+def adduser(ctx,name,user,pk):
+    try:
+        ctx.obj["host"].jail(name).adduser(user=user,pk=pk)
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -183,19 +207,6 @@ def repl(ctx,name):
             jail = ctx.obj["host"].jail(name[0])
         host = ctx.obj["host"]
         code.interact(local=locals())
-    except subprocess.CalledProcessError as e:
-        raise click.ClickException(f"{e} :: {proc_err(e)}")
-    except ValueError as e:
-        raise click.ClickException(f"{e}")
-
-@cli.command()
-@click.argument("name",nargs=1)
-@click.option("--user",required=True)
-@click.option("--pk",required=True)
-@click.pass_context
-def adduser(ctx,name,user,pk):
-    try:
-        ctx.obj["host"].jail(name).adduser(user=user,pk=pk)
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:

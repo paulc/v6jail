@@ -113,8 +113,9 @@ class Jail:
             return False
 
     @check_running
-    def jexec(self,*args):
-        return subprocess.run(["/usr/sbin/jexec","-l",self.config.jname,*args])
+    def jexec(self,*args,capture=False,check=False):
+        return subprocess.run(["/usr/sbin/jexec","-l",self.config.jname,*args],
+                              capture_output=capture,check=check)
 
     @check_fs_exists
     def sysrc(self,*args):
@@ -190,6 +191,7 @@ class Jail:
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
             route -6 add ::0.0.0.0 -prefixlen 96 ::1 -reject; 
             route -6 add ff02:: -prefixlen 16 ::1 -reject; 
+            uname -a > /etc/motd
             [ -f /etc/fstab ] && mount -al;
             {cmds}
         """
@@ -225,7 +227,8 @@ class Jail:
         params.update(jail_params or {})
         self.create_epair(private)
         self.configure_vnet()
-        subprocess.run(["/usr/sbin/jail","-cv",*[f"{k}={v}" for k,v in params.items()]],
+        flags = "-cv" if self.debug else "-c"
+        subprocess.run(["/usr/sbin/jail",flags,*[f"{k}={v}" for k,v in params.items()]],
                        check=True)
         self.local_route()
 
