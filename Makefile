@@ -1,5 +1,6 @@
 
 SOURCES := $(wildcard Makefile setup.py v6jail/*.py)
+$(info $(SOURCES))
 
 .PHONY: shiv
 shiv: bin/v6

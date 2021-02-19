@@ -1,10 +1,10 @@
 
-import binascii,configparser,ipaddress,re,sys
-from dataclasses import dataclass,field,fields,asdict
-from datetime import datetime
+import ipaddress,re,sys
+from dataclasses import dataclass,field
 from enum import Enum
 
 from .util import Command
+from .ini_encoder import IniEncoderMixin
 
 cmd = Command()
 
@@ -25,63 +25,10 @@ def host_gateway():
 
 Mode = Enum('Mode','BRIDGED ROUTED')
 
-class IniEncoderMixin:
-
-    """
-        Mixin for dataclass which supports automatic encoding/decoding
-        to/from INI file using type hints from dataclass fields
-    """
-
-    def _encode(self,field):
-        if field.type in [str,int,float,bool]:
-            return str(getattr(self,field.name))
-        elif field.type is bytes:
-            return binascii.hexlify(getattr(self,field.name)).decode('ascii')
-        elif field.type is datetime:
-            return getattr(self,field.name).isoformat()
-        elif issubclass(field.type,Enum):
-            return getattr(self,field.name).name
-        else:
-            raise ValueError("Invalid field type:", field) 
-
-    def _decode(self,field,value):
-        if field.type in (str,int,float):
-            return field.type(value)
-        elif field.type is bool:
-            return (value.lower() == 'true')
-        elif field.type is bytes:
-            return binascii.unhexlify(value)
-        elif field.type is datetime:
-            return datetime.fromisoformat(value)
-        elif issubclass(field.type,Enum):
-            return field.type[value]
-        else:
-            raise ValueError("Unsupported type:",field)
-
-    def write_config(self,section,c=None,f=None):
-        if all([c,f]) or not any([c,f]):
-            raise TypeError("Must specify either c:ConfigParser or f:typing.TextIO")
-        c = c or configparser.ConfigParser(interpolation=None)
-        c[section] = { f.name:self._encode(f) for f in fields(self) }
-        if f:
-            c.write(f)
-        return c
-
-    @classmethod
-    def read_config(cls,section,c=None,f=None):
-        if all([c,f]) or not any([c,f]):
-            raise TypeError("Must specify either c:ConfigParser or f:typing.TextIO")
-        if c is None:
-            c = configparser.ConfigParser(interpolation=None)
-            c.read_file(f)
-        params = dict(c[section])
-        fieldmap = { f.name:f for f in fields(cls) }
-        return cls(**{k:cls._decode(cls,fieldmap[k],v) for k,v in params.items()})
-
 @dataclass
 class HostConfig(IniEncoderMixin):
 
-    zroot:          str = 'zroot/jail'
+    zvol:           str = 'zroot/jail'
     mode:           Mode = Mode.BRIDGED
     bridge:         str = 'bridge0'
     hostif:         str = field(default_factory=host_default_if)
@@ -91,22 +38,34 @@ class HostConfig(IniEncoderMixin):
     vnet:           bool = True
 
     base:           str = 'base'
-    mountpoint:     str = 'zroot/jail'
+    mountpoint:     str = None
 
     salt:           bytes = b''
 
     def __post_init__(self):
         self.hostipv6 = self.hostipv6 or host_ipv6(self.hostif)
         self.prefix = self.prefix or ipaddress.IPv6Address(self.hostipv6).exploded[:19]
+        self.mountpoint = cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
 
-        if not cmd.check("/sbin/zfs","list",f"{self.zroot}/{self.base}"):
-            raise ValueError(f"base not found: {self.zroot}/{self.base}")
+        if not cmd.check("/sbin/zfs","list",f"{self.zvol}/{self.base}"):
+            raise ValueError(f"base not found: {self.zvol}/{self.base}")
 
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
 
+@dataclass
+class JailConfig(IniEncoderMixin):
 
-if __name__ == '__main__':
+    name:           str
+    hash:           str
+    ipv6:           str
+    jname:          str
+    path:           str
+    zpath:          str
+    epair_host:     str
+    epair_jail:     str
+    gateway:        str
+    bridge:         str
+    hostipv6:       str
+    base:           str
 
-    c = HostConfig()
-    c.write_config()

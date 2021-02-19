@@ -5,6 +5,7 @@ import click,tabulate
 
 from .host import Host
 from .jail import Jail
+from .config import HostConfig,JailConfig
 
 proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
 
@@ -15,10 +16,11 @@ proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
 def cli(ctx,debug,base):
     try:
         ctx.ensure_object(dict)
-        args = { "debug": debug }
         if base:
-            args["base"] = base
-        ctx.obj["host"] = Host(**args)
+            host_config = HostConfig(base=base)
+        else:
+            host_config = HostConfig()
+        ctx.obj["host"] = Host(host_config,debug)
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -31,7 +33,7 @@ def new(ctx,name):
     try:
         jail = ctx.obj["host"].jail(name)
         jail.create_fs()
-        click.secho(f"Created jail: {jail.name} (id={jail.jname})",fg="green")
+        click.secho(f"Created jail: {jail.config.name} (id={jail.config.jname})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -66,7 +68,7 @@ def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,add
             jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
         else:
             jail.start(private=private,jail_params=jail_params)
-        click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",
+        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.ipv6})",
                     fg="green")
         if jexec:
             jail.jexec(*shlex.split(jexec))
@@ -97,7 +99,7 @@ def start(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd):
             jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
         else:
             jail.start(private=private,jail_params=jail_params)
-        click.secho(f"Started jail: {jail.name} (id={jail.jname} ipv6={jail.ipv6})",fg="green")
+        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.ipv6})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -110,7 +112,7 @@ def stop(ctx,name):
     try:
         jail = ctx.obj["host"].jail(name)
         jail.stop()
-        click.secho(f"Stopped jail: {jail.name} ({jail.jname})",fg="green")
+        click.secho(f"Stopped jail: {jail.config.name} ({jail.config.jname})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -120,11 +122,11 @@ def stop(ctx,name):
 @click.option("--force",is_flag=True)
 @click.argument("name",nargs=1)
 @click.pass_context
-def remove(ctx,name,force):
+def destroy(ctx,name,force):
     try:
         jail = ctx.obj["host"].jail(name)
         jail.remove(force=force)
-        click.secho(f"Removed jail: {jail.name} ({jail.jname})",fg="green")
+        click.secho(f"Removed jail: {jail.config.name} ({jail.config.jname})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -149,7 +151,7 @@ def list(ctx,status):
 def sysrc(ctx,name,args):
     try:
         jail = ctx.obj["host"].jail(name)
-        click.secho(f"sysrc: {jail.name} ({jail.jname})",fg="yellow")
+        click.secho(f"sysrc: {jail.config.name} ({jail.config.jname})",fg="yellow")
         if args:
             click.secho(jail.sysrc("-v",*args),fg="green")
         else:
