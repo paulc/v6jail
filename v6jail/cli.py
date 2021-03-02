@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import code,shlex,subprocess
+import code,shlex,subprocess,sys
 import click,tabulate
 
 from .host import Host
@@ -11,20 +11,33 @@ proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
 
 @click.group()
 @click.option("--debug",is_flag=True)
+@click.option("--config",type=click.File("r"))
 @click.option("--base")
 @click.pass_context
-def cli(ctx,debug,base):
+def cli(ctx,debug,base,config):
     try:
         ctx.ensure_object(dict)
-        if base:
-            host_config = HostConfig(base=base)
+        if config:
+            host_config = HostConfig.read_config("host",f=config)
         else:
-            host_config = HostConfig()
+            if base:
+                host_config = HostConfig(base=base)
+            else:
+                host_config = HostConfig()
         ctx.obj["host"] = Host(host_config,debug)
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
         raise click.ClickException(f"{e}")
+
+@cli.command()
+@click.option("--dump","option",flag_value="hostconfig")
+@click.pass_context
+def config(ctx,option):
+    if option == "hostconfig":
+        ctx.obj["host"].config.write_config("host").write(sys.stdout)
+
+
 
 @cli.command()
 @click.argument("name",nargs=1)
@@ -71,7 +84,7 @@ def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,add
                 if user != "root":
                     uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()
                     jail.jexec("chroot","/compat/ubuntu",
-                               "/usr/sbin/useradd","--uid",uid,"--user-group","--groups","sudo","--shell","/bin/bash",user)
+                               "/usr/sbin/useradd","--uid",uid,"--user-group","--groups","sudo","--shell","/bin/sh",user)
             # Start SSHD
             jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ed25519","-f","/etc/ssh/ssh_host_ed25519_key","-N","")
             jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ecdsa","-f","/etc/ssh/ssh_host_ecdsa_key","-N","")

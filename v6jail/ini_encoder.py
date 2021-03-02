@@ -53,5 +53,5 @@ class IniEncoderMixin:
             c.read_file(f)
         params = dict(c[section])
         fieldmap = { f.name:f for f in fields(cls) }
-        return cls(**{k:cls._decode(cls,fieldmap[k],v) for k,v in params.items()})
+        return cls(**{k:cls._decode(fieldmap[k],v) for k,v in params.items()})
 

@@ -7,9 +7,9 @@ class Command:
 
     debug: bool = False
 
-    def cmd(self,*args):
+    def cmd(self,*args,input=None):
         try:
-            result = subprocess.run(args,capture_output=True,check=True)
+            result = subprocess.run(args,capture_output=True,check=True,input=input)
             out = result.stdout.strip().decode()
             if self.debug:
                 print("CMD:",args)

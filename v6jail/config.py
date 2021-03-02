@@ -1,5 +1,5 @@
 
-import ipaddress,re,sys
+import ipaddress,re,subprocess,sys
 from dataclasses import dataclass,field
 from enum import Enum
 
@@ -13,9 +13,9 @@ def host_default_if():
                               cmd('/sbin/route','-6','get','default')).groups()
     return default_if
 
-def host_ipv6(default_if):
+def bridge_ipv6(bridge_if):
     (ipv6,) = re.search('inet6 (?!fe80::)(\S*)',
-                        cmd('/sbin/ifconfig',default_if,'inet6')).groups()
+                        cmd('/sbin/ifconfig',bridge_if,'inet6')).groups()
     return ipv6
 
 def host_gateway():
@@ -23,35 +23,33 @@ def host_gateway():
                            cmd('/sbin/route','-6','get','default')).groups()
     return gateway
 
-Mode = Enum('Mode','BRIDGED ROUTED')
+def host_domain():
+    return cmd('/bin/hostname').rstrip('.') + '.'
 
 @dataclass
 class HostConfig(IniEncoderMixin):
 
     zvol:           str = 'zroot/jail'
-    mode:           Mode = Mode.BRIDGED
     bridge:         str = 'bridge0'
-    hostif:         str = field(default_factory=host_default_if)
     gateway:        str = field(default_factory=host_gateway)
-    hostipv6:       str = None
-    prefix:         str = None
+    prefix:         str = ''
     vnet:           bool = True
 
     base:           str = 'base'
-    mountpoint:     str = None
+    mountpoint:     str = ''
 
     salt:           bytes = b''
 
     def __post_init__(self):
-        self.hostipv6 = self.hostipv6 or host_ipv6(self.hostif)
-        self.prefix = self.prefix or ipaddress.IPv6Address(self.hostipv6).exploded[:19]
-        self.mountpoint = cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
-
         if not cmd.check("/sbin/zfs","list",f"{self.zvol}/{self.base}"):
             raise ValueError(f"base not found: {self.zvol}/{self.base}")
 
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
+
+        self.prefix = self.prefix or ipaddress.IPv6Address(bridge_ipv6(self.bridge)).exploded[:19]
+        self.mountpoint = cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
+
 
 @dataclass
 class JailConfig(IniEncoderMixin):
@@ -62,10 +60,38 @@ class JailConfig(IniEncoderMixin):
     jname:          str
     path:           str
     zpath:          str
+    base_zvol:      str
     epair_host:     str
     epair_jail:     str
     gateway:        str
     bridge:         str
-    hostipv6:       str
     base:           str
+
+@dataclass
+class DDNSConfig(IniEncoderMixin):
+
+    server:         str = "::1"
+    zone:           str = field(default_factory=host_domain)
+    ttl:            int = 0
+    tsig:           str = ''
+    nsupdate:       str = '/usr/local/bin/knsupdate'
+    debug:          bool = False
+
+    def __post_init__(self):
+        self.cmd = Command(self.debug)
+
+    def update(self,*cmds):
+        request = [ f'server {self.server}'.encode(),
+                    f'zone {self.zone}'.encode(),
+                    f'origin {self.zone}'.encode(),
+                    f'ttl {self.ttl}'.encode(),
+                  ]
+        if self.tsig:
+            request.append(f'key {self.tsig}'.encode())
+        for c in cmds:
+            request.append(c.encode())
+        request.append(b'send')
+        request.append(b'answer')
+        return self.cmd(self.nsupdate,input=b'\n'.join(request))
+
 

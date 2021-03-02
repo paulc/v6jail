@@ -1,0 +1,61 @@
+
+# Host config
+
+sysrc linux_enable=YES
+sysrc linux_mounts_enable="NO"
+service linux start
+
+# Configure linux base
+
+# Make sure fs modules loaded
+kldload -n tmpfs.ko nullfs.ko fdescfs.ko linprocfs.ko linsysfs.ko
+
+LATEST_SNAPSHOT=$(zfs list -Hrt snap -o name -s creation zroot/jail/base | tail -1)
+zfs send ${LATEST_SNAPSHOT} | zfs recv -v zroot/jail/alpine
+
+python3 -mv6jail.cli --base alpine chroot-base --snapshot <<EOM
+
+tee /etc/fstab <<__FSTAB
+devfs           /compat/alpine/dev      devfs           rw,late                      0       0
+tmpfs           /compat/alpine/dev/shm  tmpfs           rw,late,size=1g,mode=1777    0       0
+fdescfs         /compat/alpine/dev/fd   fdescfs         rw,late,linrdlnk             0       0
+linprocfs       /compat/alpine/proc     linprocfs       rw,late                      0       0
+linsysfs        /compat/alpine/sys      linsysfs        rw,late                      0       0
+/tmp            /compat/alpine/tmp      nullfs          rw,late                      0       0
+/home           /compat/alpine/home     nullfs          rw,late                      0       0
+__FSTAB
+
+mkdir /home 
+mkdir -p /compat/alpine/dev /compat/alpine/dev/shm /compat/alpine/dev/fd 
+mkdir -p /compat/alpine/proc /compat/alpine/sys /compat/alpine/tmp /compat/alpine/home
+mount -al
+
+fetch -o- https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-3.13.0-x86_64.tar.gz | tar xzvf -
+
+cp /etc/resolv.conf /compat/alpine/etc/resolv.conf
+
+chroot /compat/alpine apk update
+chroot /compat/alpine /sbin/apk add openrc openssh sudo
+chroot /compat/alpine mkdir -p /run/openrc
+chroot /compat/alpine touch /run/openrc/softlevel
+chroot /compat/alpine rc-update add sshd
+echo '%wheel ALL=(ALL) NOPASSWD: ALL' | chroot /compat/alpine tee -a /etc/sudoers.d/sudo-nopasswd
+
+sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
+
+umount -a
+
+EOM
+
+# To boot linux (with user)
+
+USER=<user>
+PK=<pk>
+
+python3 -mv6jail.cli --base alpine run --fastboot --adduser "${USER}" "${PK}" --linux --shell <name> <<EOM
+chroot /compat/alpine /usr/sbin/addgroup --gid $(id -g "${USER}") "${USER}"
+chroot /compat/alpine /usr/sbin/adduser --no-create-home --disabled-password --ingroup wheel --uid $(id -u "${USER}") "${USER}" "${USER}"
+chroot /compat/alpine /sbin/rc-service sshd start
+EOM
+
+

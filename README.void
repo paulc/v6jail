@@ -1,0 +1,52 @@
+
+# Host config
+
+sysrc linux_enable=YES
+sysrc linux_mounts_enable="NO"
+service linux start
+
+# Configure linux base
+
+LATEST_SNAPSHOT=$(zfs list -Hrt snap -o name -s creation zroot/jail/base | tail -1)
+
+zfs send ${LATEST_SNAPSHOT} | zfs recv -v zroot/jail/linux
+
+python3 -mv6jail.cli --base linux chroot-base --snapshot <<EOM
+
+tee /etc/fstab <<__FSTAB
+devfs           /compat/void/dev      devfs           rw,late                      0       0
+tmpfs           /compat/void/dev/shm  tmpfs           rw,late,size=1g,mode=1777    0       0
+fdescfs         /compat/void/dev/fd   fdescfs         rw,late,linrdlnk             0       0
+linprocfs       /compat/void/proc     linprocfs       rw,late                      0       0
+linsysfs        /compat/void/sys      linsysfs        rw,late                      0       0
+/tmp            /compat/void/tmp      nullfs          rw,late                      0       0
+/home           /compat/void/home     nullfs          rw,late                      0       0
+__FSTAB
+
+mkdir /home 
+mkdir -p /compat/void/dev /compat/void/dev/shm /compat/void/dev/fd 
+mkdir -p /compat/void/proc /compat/void/sys /compat/void/tmp /compat/void/home
+mount -al
+
+fetch -o- https://alpha.de.repo.voidlinux.org/static/xbps-static-latest.x86_64-musl.tar.xz | tar -C /compat/void -xvf -
+# (Ignore tar errors)
+# /usr/bin/iputils-ping: Cannot restore extended attributes: security.capability
+# tar: Error exit delayed from previous errors.
+
+cp /etc/resolv.conf /compat/void/etc/
+chroot /compat/void/ /bin/bash <<EOM
+xbps-install -Su -y xbps
+xbps-install -y -u
+xbps-install -y base-system
+xbps-remove -y base-voidstrap
+
+EOM
+
+# To boot linux (with user)
+
+python3 -mv6jail.cli --base linux run --fastboot --adduser <user> <pk> --linux --shell <name> <<'EOM'
+chroot /compat/ubuntu /usr/sbin/useradd --uid $(id -u <user>) --user-group --shell /bin/bash <user>
+chroot /compat/ubuntu /usr/sbin/service ssh start
+EOM
+
+

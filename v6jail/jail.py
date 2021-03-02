@@ -56,13 +56,22 @@ class Jail:
         self.mounted_fs     = lambda : self.cmd("/sbin/mount")
         self.umount_fs      = lambda args : self.cmd("/sbin/mount","-f",*args)
 
+    def get_latest_snapshot(self):
+        out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-s", "creation", "-o", "name", 
+                              f"{self.config.base_zvol}")
+        if out:
+            return out.split("\n")[-1]
+        else:
+            raise ValueError(f"No snapshots found: {self.config.base_zvol}")
+
     def create_epair(self,private=True):
         if self.check_epair():
             self.destroy_epair()
         epair = self.ifconfig("epair","create")[:-1]
         self.ifconfig(f"{epair}a","name",self.config.epair_host)
         self.ifconfig(f"{epair}b","name",self.config.epair_jail)
-        self.ifconfig(self.config.epair_host,"inet6","auto_linklocal","up")
+        # If bridge has IPv6 address cant configure link-local address
+        self.ifconfig(self.config.epair_host,"inet6","up")
         if private:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host,"private",self.config.epair_host)
         else:
@@ -83,15 +92,18 @@ class Jail:
         if fs:
             self.umount_fs(fs)
 
-    def get_lladdr(self):
-        (lladdr_host,) = re.search("inet6 (fe80::.*?)%",self.ifconfig(self.config.epair_host)).groups()
-        lladdr_jail = lladdr_host[:-1] + "b"
-        return (lladdr_host,lladdr_jail)
-
-    def local_route(self):
-        lladdr_host,lladdr_jail = self.get_lladdr()
-        self.route6("add",self.config.ipv6,f"{lladdr_jail}%{self.config.epair_host}")
-        self.jail_route6("add",self.config.hostipv6,f"{lladdr_host}%{self.config.epair_jail}")
+#
+#    Don't need to do this if IPv6 address associated with bridge
+#
+#    def get_lladdr(self):
+#        (lladdr_host,) = re.search("inet6 (fe80::.*?)%",self.ifconfig(self.config.epair_host)).groups()
+#        lladdr_jail = lladdr_host[:-1] + "b"
+#        return (lladdr_host,lladdr_jail)
+#
+#    def local_route(self):
+#        lladdr_host,lladdr_jail = self.get_lladdr()
+#        self.route6("add",self.config.ipv6,f"{lladdr_jail}%{self.config.epair_host}")
+#        self.jail_route6("add",self.config.hostipv6,f"{lladdr_host}%{self.config.epair_jail}")
 
     def is_running(self):
         return self.cmd.check("jls","-Nj",self.config.jname)
@@ -186,7 +198,7 @@ class Jail:
         return f"""
             ifconfig lo0 inet6 up;
             ifconfig {self.config.epair_jail} inet6 {self.config.ipv6} auto_linklocal;
-            route -6 add default fe80::1%{self.config.epair_jail};
+            route -6 add default {self.config.gateway};
             route -6 add fe80:: -prefixlen 10 ::1 -reject;
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
             route -6 add ::0.0.0.0 -prefixlen 96 ::1 -reject; 
@@ -199,7 +211,7 @@ class Jail:
     def create_fs(self):
         if self.check_fs():
             raise ValueError(f"Jail FS exists: {self.config.name} ({self.config.zpath})")
-        self.zfs_clone(self.host.get_latest_snapshot(),self.config.zpath)
+        self.zfs_clone(self.get_latest_snapshot(),self.config.zpath)
         self.zfs_set(f"jail:name={self.config.name}",
                      f"jail:ipv6={self.config.ipv6}",
                      f"jail:base={self.config.base}")
@@ -230,7 +242,7 @@ class Jail:
         flags = "-cv" if self.debug else "-c"
         subprocess.run(["/usr/sbin/jail",flags,*[f"{k}={v}" for k,v in params.items()]],
                        check=True)
-        self.local_route()
+        # self.local_route()
 
     @check_running
     def stop(self):

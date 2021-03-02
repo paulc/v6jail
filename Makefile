@@ -1,12 +1,18 @@
 
-SOURCES := $(wildcard Makefile setup.py v6jail/*.py)
+SOURCES := $(wildcard Makefile setup.py preamble.py v6jail/*.py)
 $(info $(SOURCES))
 
 .PHONY: shiv
 shiv: bin/v6
 
 bin/v6: ${SOURCES}
-	@shiv -p '/usr/bin/env -S python3 -sE' --compile-pyc --compressed -e v6jail.cli:cli -o bin/v6 .
+	@shiv --python '/usr/local/bin/python3 -sE' \
+		  --compile-pyc \
+		  --compressed \
+		  --preamble ./preamble.py \
+		  --entry-point v6jail.cli:cli \
+		  --output-file bin/v6 \
+		  .
 
 .PHONY: upload-shiv
 upload-shiv: shiv

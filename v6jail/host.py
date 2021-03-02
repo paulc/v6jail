@@ -94,11 +94,11 @@ class Host:
                           jname = f"j_{b32_digest}",
                           path = f"{self.config.mountpoint}/{b32_digest}",
                           zpath = f"{self.config.zvol}/{b32_digest}",
+                          base_zvol = f"{self.config.zvol}/{self.config.base}",
                           epair_host = f"{b32_digest}A",
                           epair_jail = f"{b32_digest}B",
                           gateway = self.generate_gateway(f"{b32_digest}B"),
                           bridge = self.config.bridge,
-                          hostipv6 = self.config.hostipv6,
                           base = self.config.base,
         )
 
@@ -145,7 +145,7 @@ class Host:
                          volume=os.path.basename(vol),
                          jid=f"j_{os.path.basename(vol)}",
                          ipv6=ipv6,
-                         running=self.cmd.check_cmd("jls","-Nj","j_"+os.path.basename(vol)))
+                         running=self.cmd.check("jls","-Nj","j_"+os.path.basename(vol)))
                     for (vol,name,base,ipv6) in jails if base != "-"]
         else:
             return [dict(name=name,
