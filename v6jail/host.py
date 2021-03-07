@@ -64,10 +64,9 @@ class Host:
         self.cmd = Command(self.debug)
 
     def generate_addr(self,name):
-        a,b,c,d = struct.unpack("4H",
-                    hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
-                  )
-        return "{}:{:x}:{:x}:{:x}:{:x}".format(self.config.prefix,a,b,c,d)
+        digest = hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
+        host_address = struct.unpack("L",digest)[0] & int(self.config.network.hostmask) 
+        return self.config.network.network_address + host_address
 
     def generate_hash(self,name):
         return base64.b32encode(
@@ -85,12 +84,12 @@ class Host:
     def generate_jail_config(self,name):
         digest = hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
         b32_digest = base64.b32encode(digest).lower().rstrip(b"=").decode()
-        a,b,c,d = struct.unpack("4H",digest)
-        ipv6 = "{}:{:x}:{:x}:{:x}:{:x}".format(self.config.prefix,a,b,c,d)
+        address = self.generate_addr(name)
 
         return JailConfig(name = name,
                           hash = b32_digest,
-                          ipv6 = ipv6,
+                          address = address,
+                          prefixlen = self.config.network.prefixlen,
                           jname = f"j_{b32_digest}",
                           path = f"{self.config.mountpoint}/{b32_digest}",
                           zpath = f"{self.config.zvol}/{b32_digest}",

@@ -92,7 +92,7 @@ def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,add
             jail.jexec("chroot","/compat/ubuntu","/usr/sbin/service","ssh","start")
         else:
             jail.start(private=private,jail_params=jail_params)
-        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.ipv6})",
+        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.address})",
                     fg="green")
         if jexec:
             jail.jexec(*shlex.split(jexec))
@@ -136,7 +136,7 @@ def start(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd):
             jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
         else:
             jail.start(private=private,jail_params=jail_params)
-        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.ipv6})",fg="green")
+        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.address})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:

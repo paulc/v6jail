@@ -197,7 +197,7 @@ class Jail:
         cmds = ";\n".join([*services,*cmds])
         return f"""
             ifconfig lo0 inet6 up;
-            ifconfig {self.config.epair_jail} inet6 {self.config.ipv6} auto_linklocal;
+            ifconfig {self.config.epair_jail} inet6 {self.config.address} prefixlen {self.config.prefixlen} auto_linklocal;
             route -6 add default {self.config.gateway};
             route -6 add fe80:: -prefixlen 10 ::1 -reject;
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
@@ -213,13 +213,13 @@ class Jail:
             raise ValueError(f"Jail FS exists: {self.config.name} ({self.config.zpath})")
         self.zfs_clone(self.get_latest_snapshot(),self.config.zpath)
         self.zfs_set(f"jail:name={self.config.name}",
-                     f"jail:ipv6={self.config.ipv6}",
+                     f"jail:ipv6={self.config.address}",
                      f"jail:base={self.config.base}")
 
     @check_fs_exists
     def configure_vnet(self):
         self.sysrc(f"network_interfaces=lo0 {self.config.epair_jail}",
-                   f"ifconfig_{self.config.epair_jail}_ipv6=inet6 {self.config.ipv6}/64",
+                   f"ifconfig_{self.config.epair_jail}_ipv6=inet6 {self.config.address}/{self.config.prefixlen}",
                    f"ipv6_defaultrouter={self.config.gateway}",
                    f"ifconfig_lo0=up",
                    f"ifconfig_lo0_ipv6=inet6 up")

@@ -2,6 +2,7 @@
 import ipaddress,re,subprocess,sys
 from dataclasses import dataclass,field
 from enum import Enum
+from ipaddress import IPv6Network,IPv6Address
 
 from .util import Command
 from .ini_encoder import IniEncoderMixin
@@ -14,9 +15,9 @@ def host_default_if():
     return default_if
 
 def bridge_ipv6(bridge_if):
-    (ipv6,) = re.search('inet6 (?!fe80::)(\S*)',
+    (ipv6,prefixlen) = re.search('inet6 (?!fe80::)(\S*) prefixlen (\d+)',
                         cmd('/sbin/ifconfig',bridge_if,'inet6')).groups()
-    return ipv6
+    return IPv6Network(f'{ipv6}/{prefixlen}',strict=False)
 
 def host_gateway():
     (gateway,) = re.search('gateway: (.*)',
@@ -32,8 +33,7 @@ class HostConfig(IniEncoderMixin):
     zvol:           str = 'zroot/jail'
     bridge:         str = 'bridge0'
     gateway:        str = field(default_factory=host_gateway)
-    prefix:         str = ''
-    vnet:           bool = True
+    network:        IPv6Network = None
 
     base:           str = 'base'
     mountpoint:     str = ''
@@ -47,16 +47,16 @@ class HostConfig(IniEncoderMixin):
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
 
-        self.prefix = self.prefix or ipaddress.IPv6Address(bridge_ipv6(self.bridge)).exploded[:19]
-        self.mountpoint = cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
-
+        self.network = self.network or bridge_ipv6(self.bridge)
+        self.mountpoint = self.mountpoint or cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
 
 @dataclass
 class JailConfig(IniEncoderMixin):
 
     name:           str
     hash:           str
-    ipv6:           str
+    address:        IPv6Address
+    prefixlen:      int
     jname:          str
     path:           str
     zpath:          str

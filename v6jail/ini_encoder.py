@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 
 from dataclasses import fields
+from ipaddress import IPv6Network,IPv6Address
 
 class IniEncoderMixin:
 
@@ -19,6 +20,8 @@ class IniEncoderMixin:
             return binascii.hexlify(getattr(self,field.name)).decode('ascii')
         elif field.type is datetime:
             return getattr(self,field.name).isoformat()
+        elif field.type in (IPv6Network,IPv6Address):
+            return str(getattr(self,field.name))
         elif issubclass(field.type,Enum):
             return getattr(self,field.name).name
         else:
@@ -39,6 +42,8 @@ class IniEncoderMixin:
             return binascii.unhexlify(value)
         elif field.type is datetime:
             return datetime.fromisoformat(value)
+        elif field.type in (IPv6Network,IPv6Address):
+            return field.type(value)
         elif issubclass(field.type,Enum):
             return field.type[value]
         else:
