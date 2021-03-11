@@ -8,55 +8,55 @@ from .jail import Jail
 
 class Host:
 
-    DEFAULT_PARAMS = {
-            "allow.set_hostname":   False,
-            "allow.raw_sockets":    True,
-            "allow.socket_af":      True,
-            "allow.sysvipc":        True,
-            "allow.chflags":        True,
-            "mount.devfs":          True,
-            "devfs_ruleset":        4,
-            "enforce_statfs":       2,
-            "sysvmsg":              "new",
-            "sysvsem":              "new",
-            "sysvshm":              "new",
-            "children.max":         0,
-            "osrelease":            "",
-            "vnet":                 "new",
-            "vnet.interface":       "",
-            "persist":              True,
-            "exec.start":           "/bin/sh /etc/rc",
-    }
-
-    LINUX_PARAMS = {
-            "allow.set_hostname":   False,
-            "allow.raw_sockets":    True,
-            "allow.socket_af":      True,
-            "allow.sysvipc":        True,
-            "allow.chflags":        True,
-            "mount.devfs":          True,
-            "devfs_ruleset":        4,
-            "enforce_statfs":       2,
-            "sysvmsg":              "new",
-            "sysvsem":              "new",
-            "sysvshm":              "new",
-            "children.max":         0,
-            "osrelease":            "",
-            "vnet":                 "new",
-            "vnet.interface":       "",
-            "persist":              True,
-            "exec.start":           "/bin/sh /etc/rc",
-            # Needed for Linux emulation
-            "devfs_ruleset":        20,
-            "enforce_statfs":       1,
-            "allow.mount":          True,
-            "allow.mount.devfs":    True,
-            "allow.mount.fdescfs":  True,
-            "allow.mount.linprocfs":True,
-            "allow.mount.linsysfs": True,
-            "allow.mount.tmpfs":    True,
-            "allow.mount.nullfs":   True,
-    }
+#    DEFAULT_PARAMS = {
+#            "allow.set_hostname":   False,
+#            "allow.raw_sockets":    True,
+#            "allow.socket_af":      True,
+#            "allow.sysvipc":        True,
+#            "allow.chflags":        True,
+#            "mount.devfs":          True,
+#            "devfs_ruleset":        4,
+#            "enforce_statfs":       2,
+#            "sysvmsg":              "new",
+#            "sysvsem":              "new",
+#            "sysvshm":              "new",
+#            "children.max":         0,
+#            "osrelease":            "",
+#            "vnet":                 "new",
+#            "vnet.interface":       "",
+#            "persist":              True,
+#            "exec.start":           "/bin/sh /etc/rc",
+#    }
+#
+#    LINUX_PARAMS = {
+#            "allow.set_hostname":   False,
+#            "allow.raw_sockets":    True,
+#            "allow.socket_af":      True,
+#            "allow.sysvipc":        True,
+#            "allow.chflags":        True,
+#            "mount.devfs":          True,
+#            "devfs_ruleset":        4,
+#            "enforce_statfs":       2,
+#            "sysvmsg":              "new",
+#            "sysvsem":              "new",
+#            "sysvshm":              "new",
+#            "children.max":         0,
+#            "osrelease":            "",
+#            "vnet":                 "new",
+#            "vnet.interface":       "",
+#            "persist":              True,
+#            "exec.start":           "/bin/sh /etc/rc",
+#            # Needed for Linux emulation
+#            "devfs_ruleset":        20,
+#            "enforce_statfs":       1,
+#            "allow.mount":          True,
+#            "allow.mount.devfs":    True,
+#            "allow.mount.fdescfs":  True,
+#            "allow.mount.linprocfs":True,
+#            "allow.mount.linsysfs": True,
+#            "allow.mount.tmpfs":    True,
+#            "allow.mount.nullfs":   True,
+#    }
 
     def __init__(self,config:HostConfig,debug:bool=False):
         self.config = config
@@ -85,18 +85,23 @@ class Host:
         digest = hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
         b32_digest = base64.b32encode(digest).lower().rstrip(b"=").decode()
         address = self.generate_addr(name)
+        gateway = self.generate_gateway(f"{b32_digest}B")
+        if '%' in gateway:
+            prefixlen = 128
+        else:
+            prefixlen = self.config.network.prefixlen
 
         return JailConfig(name = name,
                           hash = b32_digest,
                           address = address,
-                          prefixlen = self.config.network.prefixlen,
+                          prefixlen = prefixlen,
                           jname = f"j_{b32_digest}",
                           path = f"{self.config.mountpoint}/{b32_digest}",
                           zpath = f"{self.config.zvol}/{b32_digest}",
                           base_zvol = f"{self.config.zvol}/{self.config.base}",
                           epair_host = f"{b32_digest}A",
                           epair_jail = f"{b32_digest}B",
-                          gateway = self.generate_gateway(f"{b32_digest}B"),
+                          gateway = gateway,
                           bridge = self.config.bridge,
                           base = self.config.base,
         )
@@ -159,9 +164,3 @@ class Host:
             debug = self.debug
         return Jail(self.generate_jail_config(name),self,debug)
         
-    def jail_from_hash(self,jail_hash,debug=None):
-        if debug is None:
-            debug = self.debug
-        name = self.name_from_hash(jail_hash)
-        return Jail(self.generate_jail_config(name),self,debug)
-

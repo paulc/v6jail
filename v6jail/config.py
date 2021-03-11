@@ -94,4 +94,3 @@ class DDNSConfig(IniEncoderMixin):
         request.append(b'answer')
         return self.cmd(self.nsupdate,input=b'\n'.join(request))
 
-
