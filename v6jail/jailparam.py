@@ -1,5 +1,5 @@
 
-import shlex
+import configparser,shlex
 from collections import UserDict
 
 def check(k,v,t):
@@ -11,7 +11,7 @@ class JailParam(UserDict):
 
     _int_params = {
             'jid', 'securelevel', 'devfs_ruleset', 'children.max', 
-            'children.cur', 'cpuset.id', 'parent'
+            'children.cur', 'cpuset.id', 'parent', 'enforce_statfs'
     }
 
     _str_params = {
@@ -31,7 +31,7 @@ class JailParam(UserDict):
     }
 
     _bool_params = {
-            'ip4.saddrsel', 'ip6.saddrsel', 'enforce_statfs', 'persist',
+            'ip4.saddrsel', 'ip6.saddrsel', 'persist',
             'dying', 'allow.set_hostname', 'allow.sysvipc',
             'allow.raw_sockets', 'allow.chflags', 'allow.mount',
             'allow.mount.devfs', 'allow.quotas', 'allow.read_msgbuf',
@@ -55,8 +55,8 @@ class JailParam(UserDict):
     }
 
     def __init__(self,**values):
-        self.data = self.defaults()
-        self.data.update(values)
+        self.data = {}
+        self.update(values)
 
     def __setitem__(self,k,v):
         if k in self._int_params:
@@ -72,7 +72,7 @@ class JailParam(UserDict):
                 raise ValueError(f'Invalid jail param: {k}={v} (expecting new|inherit|disable)')
         elif k in self._list_params:
             for i in v:
-                check(k,v,str)
+                check(k,i,str)
             self.data[k] = v
         else:
             raise ValueError(f'Invalid jail param: {k}={v} (key not found)')
@@ -122,17 +122,29 @@ class JailParam(UserDict):
             'allow.mount.nullfs':       True,
         }
 
+    def set_default(self):
+        self.update(self.defaults())
+        return self
+
     def enable_linux(self):
-        self.data.update(self.linux_defaults())
+        self.update(self.linux_defaults())
+        return self
 
     def enable_vnet(self,interface):
-        self.data.update({'vnet':'new','vnet.interface':interface})
+        self.update({'vnet':'new','vnet.interface':interface})
+        return self
 
     def enable_sysvipc(self,mode='new'):
-        self.data.update({'sysvmsg':mode,'sysvsem':mode,'sysvshm':mode})
+        self.update({'sysvmsg':mode,'sysvsem':mode,'sysvshm':mode})
+        return self
 
     def allow(self,param,allow=True):
-        self.data[f'allow.{param}'] = allow
+        self[f'allow.{param}'] = allow
+        return self
+
+    def set(self,k,v):
+        self[k] = v
+        return self
 
     def params(self):
         params = []
@@ -141,11 +153,55 @@ class JailParam(UserDict):
                 params.append(f'{k}={str(v).lower()}')
             elif k in self._int_params:
                 params.append(f'{k}={v}')
-            elif k in self._str_params | self._pseudo_params:
+            elif k in self._str_params|self._pseudo_params|self._control_params:
                 params.append(f'{k}={shlex.quote(v)}')
             elif k in self._list_params:
                 params.append(f'{k}={shlex.quote(",".join(v))}')
             else:
                 raise ValueError(f"Invalid value: {k}={v}")
         return params
+
+    def write_config(self,section,c=None):
+        c = c or configparser.ConfigParser(interpolation=None)
+        params = {}
+        for k,v in self.data.items():
+            if k in self._bool_params    |\
+                    self._int_params     |\
+                    self._str_params     |\
+                    self._pseudo_params  |\
+                    self._control_params:
+                params[k] = str(v)
+            elif k in self._list_params:
+                params[k] = ','.join(v)
+            else:
+                raise ValueError(f"Invalid value: {k}={v}")
+        c[section] = params
+        return c
+
+    @classmethod
+    def default(cls):
+        j = cls()
+        return j.set_default()
+
+    @classmethod
+    def read_config(cls,section,c=None,f=None):
+        if all([c,f]) or not any([c,f]):
+            raise TypeError("Must specify either c:ConfigParser or f:typing.TextIO")
+        if c is None:
+            c = configparser.ConfigParser(interpolation=None)
+            c.read_file(f)
+        j = cls()
+        params = {}
+        for k,v in dict(c[section]).items():
+            if k in cls._bool_params:
+                j[k] = (v == 'True')
+            elif k in cls._int_params:
+                j[k] = int(v)
+            elif k in cls._str_params|cls._pseudo_params|cls._control_params:
+                j[k] = v
+            elif k in cls._list_params:
+                j[k] = v.split(',')
+            else:
+                raise ValueError(f"Invalid value: {k}={v}")
+        return j
 
