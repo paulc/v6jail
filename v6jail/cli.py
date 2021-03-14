@@ -92,7 +92,7 @@ def run(ctx,name,private,jail_params,linux,fastboot,force_ndp,
                     fg="green")
         if force_ndp:
             jail.jexec('/bin/sh','-c',f'''
-                while :; 
+                for i in $(/usr/bin/jot 10); 
                     do ping6 -o {jail.config.gateway} >/dev/null 2>&1 && break; 
                     sleep 1; 
                 done &''')
