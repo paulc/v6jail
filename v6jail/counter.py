@@ -16,7 +16,7 @@ def locked_fd(filename):
 
 def counter(filename,n=1):
     with locked_fd(filename) as fd:
-        c = os.read(fd,20)
+        c = os.read(fd,40)
         new = (int(c) if c else 0) + n
         new_b = f'{new}\n'.encode('ascii')
         os.lseek(fd,0,os.SEEK_SET)
@@ -30,4 +30,4 @@ if __name__ == '__main__':
     parser.add_argument('filename',help='Counter filename')
     parser.add_argument('increment',type=int,nargs='?',default=1,help='Increment')
     args = parser.parse_args()
-    counter(increment(args.filename,args.increment))
+    print(counter(args.filename,args.increment))
