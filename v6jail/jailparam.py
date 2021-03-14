@@ -41,13 +41,13 @@ class JailParam(UserDict):
             'allow.mount.linsysfs', 'allow.mount.tmpfs','allow.mount.zfs',
             'allow.vmm',
             # Pseudo bool params
-            'mount.devfs', 'mount.fdescfs', 'mount.procfs'
+            'mount.devfs', 'mount.fdescfs', 'mount.procfs', 'exec.clean'
     } 
 
     _pseudo_params = {
             'exec.prepare', 'exec.prestart', 'exec.created', 'exec.start',
             'command', 'exec.poststart', 'exec.prestop', 'exec.stop',
-            'exec.poststop', 'exec.release', 'exec.clean', 'exec.jail_user',
+            'exec.poststop', 'exec.release', 'exec.jail_user',
             'exec.system_jail_user', 'exec.system_user', 'exec.timeout',
             'exec.consolelog', 'exec.fib', 'stop.timeout', 'interface',
             'vnet.interface', 'ip_hostname', 'mount', 'mount.fstab',
@@ -108,6 +108,7 @@ class JailParam(UserDict):
             'children.max':             0,
             'persist':                  True,
             'exec.start':               '/bin/sh /etc/rc',
+            'exec.clean':               True,
         }
 
     def linux_defaults(self):
@@ -146,7 +147,20 @@ class JailParam(UserDict):
         self[k] = v
         return self
 
-    def params(self):
+    def set_kvpair(self,kv):
+        k,v = kv.split('=',maxsplit=1)
+        if k in self._bool_params:
+            self.data[k] = v.lower == 'true'
+        elif k in self._int_params:
+            self.data[k] = int(v)
+        elif k in self._list_params:
+            self.data[k] = v.split(',')
+        elif k in self._str_params|self._pseudo_params|self._control_params:
+            self.data[k] = v
+        else:
+            raise ValueError(f"Invalid value: {k}={v}")
+
+    def jail_params(self):
         params = []
         for k,v in self.data.items():
             if k in self._bool_params:
@@ -154,9 +168,9 @@ class JailParam(UserDict):
             elif k in self._int_params:
                 params.append(f'{k}={v}')
             elif k in self._str_params|self._pseudo_params|self._control_params:
-                params.append(f'{k}={shlex.quote(v)}')
+                params.append(f'{k}={v}')
             elif k in self._list_params:
-                params.append(f'{k}={shlex.quote(",".join(v))}')
+                params.append(f'{k}={",".join(v)}')
             else:
                 raise ValueError(f"Invalid value: {k}={v}")
         return params

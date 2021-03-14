@@ -2,6 +2,7 @@
 import functools,os,re,shutil,subprocess,tempfile
 
 from .util import Command
+from .jailparam import JailParam
 
 # Use decorators to check state
 def check_running(f):
@@ -30,12 +31,12 @@ def check_fs_exists(f):
 
 class Jail:
 
-    def __init__(self,config,host,debug=False):
+    def __init__(self,config,debug=False):
 
         # Jail params
         self.config = config
-        self.host = host
         self.debug = debug
+
         self.cmd = Command(self.debug)
 
         # Useful commands
@@ -70,10 +71,11 @@ class Jail:
         epair = self.ifconfig("epair","create")[:-1]
         self.ifconfig(f"{epair}a","name",self.config.epair_host)
         self.ifconfig(f"{epair}b","name",self.config.epair_jail)
-        # If bridge has IPv6 address cant configure link-local address
+        # If bridge has IPv6 address can't configure link-local address
         self.ifconfig(self.config.epair_host,"inet6","up")
         if private:
-            self.ifconfig(self.config.bridge,"addm",self.config.epair_host,"private",self.config.epair_host)
+            self.ifconfig(self.config.bridge,"addm",self.config.epair_host,
+                                             "private",self.config.epair_host)
         else:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host)
 
@@ -224,25 +226,29 @@ class Jail:
                    f"ifconfig_lo0=up",
                    f"ifconfig_lo0_ipv6=inet6 up")
 
+    def get_jailparams(self):
+        params = JailParam.default()
+        params.enable_vnet(self.config.epair_jail)
+        params.enable_sysvipc()
+        params.allow("raw_sockets")
+        params.allow("socket_af")
+        params.allow("chflags")
+        params.set("name",self.config.jname)
+        params.set("path",self.config.path)
+        params.set("host.hostname",self.config.name)
+        params.set("host.hostuuid",self.config.name)
+        return params
+
     @check_fs_exists
     @check_not_running
-    def start(self,private=True,jail_params=None,param_set=None):
-        if param_set:
-            params = param_set.copy()
-        else:
-            params = self.host.DEFAULT_PARAMS.copy()
-        params["name"] = self.config.jname
-        params["path"] = self.config.path
-        params["vnet.interface"] = self.config.epair_jail
-        params["host.hostname"] = self.config.name
-        params["osrelease"] = self.osrelease()
-        params.update(jail_params or {})
+    def start(self,params=None,private=True):
+        if not params:
+            params = self.get_jailparams()
         self.create_epair(private)
         self.configure_vnet()
         flags = "-cv" if self.debug else "-c"
-        subprocess.run(["/usr/sbin/jail",flags,*[f"{k}={v}" for k,v in params.items()]],
+        subprocess.run(["/usr/sbin/jail",flags,*params.jail_params()],
                        check=True)
-        # self.local_route()
 
     @check_running
     def stop(self):

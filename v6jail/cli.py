@@ -55,7 +55,7 @@ def new(ctx,name):
 @cli.command()
 @click.argument("name",nargs=1)
 @click.option("--private",is_flag=True)
-@click.option("--params",multiple=True)
+@click.option("--jail-params",multiple=True)
 @click.option("--linux",is_flag=True)
 @click.option("--shell",is_flag=True)
 @click.option("--jexec")
@@ -64,34 +64,44 @@ def new(ctx,name):
 @click.option("--fastboot-cmd",multiple=True)
 @click.option("--adduser",nargs=2,multiple=True)
 @click.pass_context
-def run(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd,adduser,shell,jexec):
+def run(ctx,name,private,jail_params,linux,fastboot,
+            fastboot_service,fastboot_cmd,adduser,shell,jexec):
     try:
         jail = ctx.obj["host"].jail(name)
         if not jail.check_fs():
             jail.create_fs()
         if jail.is_running():
             raise click.UsageError(f"Jail {name} running")
-        jail_params = dict([p.split("=") for p in params])
+        params = jail.get_jailparams()
+        for p in jail_params:
+            params.set_kvpair(p)
         if fastboot:
-            jail_params["exec.start"] = jail.fastboot_script(services=fastboot_service,
-                                                             cmds=fastboot_cmd)
+            params.set("exec.start",
+                       jail.fastboot_script(services=fastboot_service,cmds=fastboot_cmd))
         for (user,pk) in adduser:
             jail.adduser(user=user,pk=pk)
         if linux:
-            jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
+            params.enable_linux()
+            jail.start(params=params,private=private)
             # Sync linux users
             for (user,_) in adduser:
                 if user != "root":
                     uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()
                     jail.jexec("chroot","/compat/ubuntu",
-                               "/usr/sbin/useradd","--uid",uid,"--user-group","--groups","sudo","--shell","/bin/sh",user)
+                               "/usr/sbin/useradd","--uid",uid,
+                                                   "--user-group",
+                                                   "--groups","sudo",
+                                                   "--shell","/bin/sh",
+                                                   user)
             # Start SSHD
-            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ed25519","-f","/etc/ssh/ssh_host_ed25519_key","-N","")
+            jail.jexec("chroot","/compat/ubuntu",
+                    "/usr/bin/ssh-keygen","-q","-t","ed25519",
+                                          "-f","/etc/ssh/ssh_host_ed25519_key","-N","")
             jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ecdsa","-f","/etc/ssh/ssh_host_ecdsa_key","-N","")
             jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","rsa","-f","/etc/ssh/ssh_host_rsa_key","-N","")
             jail.jexec("chroot","/compat/ubuntu","/usr/sbin/service","ssh","start")
         else:
-            jail.start(private=private,jail_params=jail_params)
+            jail.start(params=params,private=private)
         click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.address})",
                     fg="green")
         if jexec:
@@ -118,24 +128,23 @@ def adduser(ctx,name,user,pk):
 
 @cli.command()
 @click.argument("name",nargs=1)
-@click.option("--params",multiple=True)
+@click.option("--jail-params",multiple=True)
 @click.option("--linux",is_flag=True)
 @click.option("--private",is_flag=True)
 @click.option("--fastboot",is_flag=True)
 @click.option("--fastboot-service",multiple=True)
 @click.option("--fastboot-cmd",multiple=True)
 @click.pass_context
-def start(ctx,name,private,params,linux,fastboot,fastboot_service,fastboot_cmd):
+def start(ctx,name,private,jail_params,linux,fastboot,fastboot_service,fastboot_cmd):
     try:
         jail = ctx.obj["host"].jail(name)
-        jail_params = dict([p.split("=") for p in params])
+        params = jail.get_jailparams()
+        params.update(dict([p.split("=") for p in jail_params]))
         if fastboot:
-            jail_params["exec.start"] = jail.fastboot_script(services=fastboot_service,
-                                                             cmds=fastboot_cmd)
+            params.set("exec.start",jail.fastboot_script(services=fastboot_service,cmds=fastboot_cmd))
         if linux:
-            jail.start(private=private,jail_params=jail_params,param_set=ctx.obj["host"].LINUX_PARAMS)
-        else:
-            jail.start(private=private,jail_params=jail_params)
+            params.enable_linux()
+        jail.start(params=params,private=private)
         click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.address})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")

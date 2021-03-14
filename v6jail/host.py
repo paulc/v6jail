@@ -8,56 +8,6 @@ from .jail import Jail
 
 class Host:
 
-#    DEFAULT_PARAMS = {
-#            "allow.set_hostname":   False,
-#            "allow.raw_sockets":    True,
-#            "allow.socket_af":      True,
-#            "allow.sysvipc":        True,
-#            "allow.chflags":        True,
-#            "mount.devfs":          True,
-#            "devfs_ruleset":        4,
-#            "enforce_statfs":       2,
-#            "sysvmsg":              "new",
-#            "sysvsem":              "new",
-#            "sysvshm":              "new",
-#            "children.max":         0,
-#            "osrelease":            "",
-#            "vnet":                 "new",
-#            "vnet.interface":       "",
-#            "persist":              True,
-#            "exec.start":           "/bin/sh /etc/rc",
-#    }
-#
-#    LINUX_PARAMS = {
-#            "allow.set_hostname":   False,
-#            "allow.raw_sockets":    True,
-#            "allow.socket_af":      True,
-#            "allow.sysvipc":        True,
-#            "allow.chflags":        True,
-#            "mount.devfs":          True,
-#            "devfs_ruleset":        4,
-#            "enforce_statfs":       2,
-#            "sysvmsg":              "new",
-#            "sysvsem":              "new",
-#            "sysvshm":              "new",
-#            "children.max":         0,
-#            "osrelease":            "",
-#            "vnet":                 "new",
-#            "vnet.interface":       "",
-#            "persist":              True,
-#            "exec.start":           "/bin/sh /etc/rc",
-#            # Needed for Linux emulation
-#            "devfs_ruleset":        20,
-#            "enforce_statfs":       1,
-#            "allow.mount":          True,
-#            "allow.mount.devfs":    True,
-#            "allow.mount.fdescfs":  True,
-#            "allow.mount.linprocfs":True,
-#            "allow.mount.linsysfs": True,
-#            "allow.mount.tmpfs":    True,
-#            "allow.mount.nullfs":   True,
-#    }
-
     def __init__(self,config:HostConfig,debug:bool=False):
         self.config = config
         self.debug = debug
@@ -125,16 +75,19 @@ class Host:
             raise ValueError(f"No snapshots found: {self.config.zvol}/{self.config.base}")
 
     def snapshot_base(self):
-        self.cmd("/sbin/zfs","snapshot",f"{self.config.zvol}/{self.config.base}@{time.strftime('%s')}")
+        self.cmd("/sbin/zfs","snapshot",
+                    f"{self.config.zvol}/{self.config.base}@{time.strftime('%s')}")
 
     def chroot_base(self,cmds=None,snapshot=True):
         self.cmd("/sbin/mount","-t","devfs","-o","ruleset=2","devfs",
                     f"{self.config.mountpoint}/{self.config.base}/dev")
         if cmds:
-            subprocess.run(["/usr/sbin/chroot",f"{self.config.mountpoint}/{self.config.base}","/bin/sh"],
-                    input=b"\n".join([c.encode() for c in cmds]))
+            subprocess.run(["/usr/sbin/chroot",
+                            f"{self.config.mountpoint}/{self.config.base}","/bin/sh"],
+                           input=b"\n".join([c.encode() for c in cmds]))
         else:
-            subprocess.run(["/usr/sbin/chroot",f"{self.config.mountpoint}/{self.config.base}","/bin/sh"])
+            subprocess.run(["/usr/sbin/chroot",
+                            f"{self.config.mountpoint}/{self.config.base}","/bin/sh"])
         self.cmd("/sbin/umount","-f",f"{self.config.mountpoint}/{self.config.base}/dev")
         if snapshot:
             self.snapshot_base()
@@ -162,5 +115,5 @@ class Host:
     def jail(self,name,debug=None):
         if debug is None:
             debug = self.debug
-        return Jail(self.generate_jail_config(name),self,debug)
+        return Jail(self.generate_jail_config(name),debug)
         
