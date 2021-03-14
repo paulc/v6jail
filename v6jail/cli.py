@@ -58,13 +58,14 @@ def new(ctx,name):
 @click.option("--jail-params",multiple=True)
 @click.option("--linux",is_flag=True)
 @click.option("--shell",is_flag=True)
+@click.option("--force-ndp",is_flag=True)
 @click.option("--jexec")
 @click.option("--fastboot",is_flag=True)
 @click.option("--fastboot-service",multiple=True)
 @click.option("--fastboot-cmd",multiple=True)
 @click.option("--adduser",nargs=2,multiple=True)
 @click.pass_context
-def run(ctx,name,private,jail_params,linux,fastboot,
+def run(ctx,name,private,jail_params,linux,fastboot,force_ndp,
             fastboot_service,fastboot_cmd,adduser,shell,jexec):
     try:
         jail = ctx.obj["host"].jail(name)
@@ -83,27 +84,18 @@ def run(ctx,name,private,jail_params,linux,fastboot,
         if linux:
             params.enable_linux()
             jail.start(params=params,private=private)
-            # Sync linux users
-            for (user,_) in adduser:
-                if user != "root":
-                    uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()
-                    jail.jexec("chroot","/compat/ubuntu",
-                               "/usr/sbin/useradd","--uid",uid,
-                                                   "--user-group",
-                                                   "--groups","sudo",
-                                                   "--shell","/bin/sh",
-                                                   user)
-            # Start SSHD
-            jail.jexec("chroot","/compat/ubuntu",
-                    "/usr/bin/ssh-keygen","-q","-t","ed25519",
-                                          "-f","/etc/ssh/ssh_host_ed25519_key","-N","")
-            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ecdsa","-f","/etc/ssh/ssh_host_ecdsa_key","-N","")
-            jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","rsa","-f","/etc/ssh/ssh_host_rsa_key","-N","")
-            jail.jexec("chroot","/compat/ubuntu","/usr/sbin/service","ssh","start")
         else:
             jail.start(params=params,private=private)
-        click.secho(f"Started jail: {jail.config.name} (id={jail.config.jname} ipv6={jail.config.address})",
+        click.secho(f"Started jail: {jail.config.name} " \
+                    f"(id={jail.config.jname} " \
+                    f"ipv6={jail.config.address})",
                     fg="green")
+        if force_ndp:
+            jail.jexec('/bin/sh','-c',f'''
+                while :; 
+                    do ping6 -o {jail.config.gateway} >/dev/null 2>&1 && break; 
+                    sleep 1; 
+                done &''')
         if jexec:
             jail.jexec(*shlex.split(jexec))
         if shell:

@@ -197,7 +197,7 @@ class Jail:
         services = [f"service {s} start" for s in (services or ["syslogd","cron","sshd"])]
         cmds = cmds or []
         cmds = ";\n".join([*services,*cmds])
-        return f"""
+        return f"""\
             ifconfig lo0 inet6 up;
             ifconfig {self.config.epair_jail} inet6 {self.config.address} prefixlen {self.config.prefixlen} auto_linklocal;
             route -6 add default {self.config.gateway};

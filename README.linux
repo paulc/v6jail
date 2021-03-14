@@ -43,11 +43,21 @@ umount -a
 
 EOM
 
-# To boot linux (with user)
-
-python3 -mv6jail.cli --base linux run --fastboot --adduser <user> <pk> --linux --shell <name> <<'EOM'
-chroot /compat/ubuntu /usr/sbin/useradd --uid $(id -u <user>) --user-group --shell /bin/bash <user>
-chroot /compat/ubuntu /usr/sbin/service ssh start
-EOM
-
+# Sync linux users
+for (user,_) in adduser:
+    if user != "root":
+        uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()
+        jail.jexec("chroot","/compat/ubuntu",
+                   "/usr/sbin/useradd","--uid",uid,
+                                       "--user-group",
+                                       "--groups","sudo",
+                                       "--shell","/bin/sh",
+                                       user)
+# Start SSHD
+jail.jexec("chroot","/compat/ubuntu",
+        "/usr/bin/ssh-keygen","-q","-t","ed25519",
+                              "-f","/etc/ssh/ssh_host_ed25519_key","-N","")
+jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","ecdsa","-f","/etc/ssh/ssh_host_ecdsa_key","-N","")
+jail.jexec("chroot","/compat/ubuntu","/usr/bin/ssh-keygen","-q","-t","rsa","-f","/etc/ssh/ssh_host_rsa_key","-N","")
+jail.jexec("chroot","/compat/ubuntu","/usr/sbin/service","ssh","start")
 
