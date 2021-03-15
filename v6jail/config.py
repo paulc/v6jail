@@ -66,6 +66,7 @@ class JailConfig(IniEncoderMixin):
     gateway:        str
     bridge:         str
     base:           str
+    private:        bool = True
 
 @dataclass
 class DDNSConfig(IniEncoderMixin):
