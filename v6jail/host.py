@@ -112,8 +112,8 @@ class Host:
                          ipv6=ipv6)
                     for (vol,name,base,ipv6) in jails if base != "-"]
 
-    def jail(self,name,debug=None):
+    def jail(self,name,params=None,debug=None):
         if debug is None:
             debug = self.debug
-        return Jail(self.generate_jail_config(name),debug)
+        return Jail(self.generate_jail_config(name),params,debug)
         

@@ -1,7 +1,8 @@
 
-import functools,io,os,re,shutil,subprocess,tempfile
+import configparser,functools,io,os,pathlib,re,shutil,subprocess,tempfile
 
 from .util import Command
+from .config import JailConfig
 from .jailparam import JailParam
 
 # Use decorators to check state
@@ -31,6 +32,14 @@ def check_fs_exists(f):
 
 class Jail:
 
+    @classmethod
+    def from_config(cls,f,jail_section="jail",jailparam_section="jail_params",debug=False):
+        c = configparser.ConfigParser(interpolation=None)
+        c.read_file(f)
+        config = JailConfig.read_config(jail_section,c=c)
+        params = JailParam.read_config(jailparam_section,c=c)
+        return cls(config,params,debug)
+
     def __init__(self,config,params=None,debug=False):
 
         # Jail params
@@ -57,6 +66,16 @@ class Jail:
         self.osrelease      = lambda : self.cmd("/usr/bin/uname","-r")
         self.mounted_fs     = lambda : self.cmd("/sbin/mount")
         self.umount_fs      = lambda args : self.cmd("/sbin/mount","-f",*args)
+
+    def write_jail_file(self,jail_path,contents,mode=0o644,binary=False):
+        if jail_path.startswith('/'):
+            jail_path = jail_path[1:]
+        dest = pathlib.Path(self.config.path,jail_path)
+        if binary:
+            dest.write_bytes(contents)
+        else:
+            dest.write_text(contents)
+        dest.chmod(mode)
 
     def get_latest_snapshot(self):
         out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-s", "creation", "-o", "name", 
@@ -223,6 +242,9 @@ class Jail:
             [ -f /etc/fstab ] && mount -al;
             {cmds}
         """
+
+    def write_fastboot(self,services=None,cmds=None):
+        self.write_jail_file("/etc/fastboot",self.fastboot_script(services,cmds),0o755)
 
     def create_fs(self):
         if self.check_fs():
