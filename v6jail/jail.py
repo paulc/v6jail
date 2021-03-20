@@ -134,8 +134,13 @@ class Jail:
 
     def add_proxy_route(self):
         lladdr_host,lladdr_jail = self.get_lladdr()
-        self.route6("add",self.config.ipv6,f"{lladdr_jail}%{self.config.epair_host}")
+        self.route6("add",str(self.config.address),f"{lladdr_jail}%{self.config.epair_host}")
+        try:
+            self.jail_route6("del","default")
+        except Exception as e:
+            print(e)
         self.jail_route6("add","default",f"{lladdr_host}%{self.config.epair_jail}")
+        self.sysrc(f"ipv6_defaultrouter={lladdr_host}%{self.config.epair_jail}")
 
     def is_running(self):
         return self.cmd.check("jls","-Nj",self.config.jname)
