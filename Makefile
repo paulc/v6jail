@@ -6,7 +6,7 @@ $(info $(SOURCES))
 shiv: bin/v6
 
 bin/v6: ${SOURCES}
-	@shiv --python '/usr/local/bin/python3 -sE' \
+	@/usr/local/bin/shiv --python '/usr/local/bin/python3 -sE' \
 		  --compile-pyc \
 		  --compressed \
 		  --preamble ./preamble.py \
