@@ -127,18 +127,15 @@ class Jail:
         if fs:
             self.umount_fs(fs)
 
-#
-#    Don't need to do this if IPv6 address associated with bridge
-#
-#    def get_lladdr(self):
-#        (lladdr_host,) = re.search("inet6 (fe80::.*?)%",self.ifconfig(self.config.epair_host)).groups()
-#        lladdr_jail = lladdr_host[:-1] + "b"
-#        return (lladdr_host,lladdr_jail)
-#
-#    def local_route(self):
-#        lladdr_host,lladdr_jail = self.get_lladdr()
-#        self.route6("add",self.config.ipv6,f"{lladdr_jail}%{self.config.epair_host}")
-#        self.jail_route6("add",self.config.hostipv6,f"{lladdr_host}%{self.config.epair_jail}")
+    def get_lladdr(self):
+        (lladdr_host,) = re.search("inet6 (fe80::.*?)%",self.ifconfig(self.config.epair_host)).groups()
+        lladdr_jail = lladdr_host[:-1] + "b"
+        return (lladdr_host,lladdr_jail)
+
+    def add_proxy_route(self):
+        lladdr_host,lladdr_jail = self.get_lladdr()
+        self.route6("add",self.config.ipv6,f"{lladdr_jail}%{self.config.epair_host}")
+        self.jail_route6("add","default",f"{lladdr_host}%{self.config.epair_jail}")
 
     def is_running(self):
         return self.cmd.check("jls","-Nj",self.config.jname)
@@ -279,6 +276,8 @@ class Jail:
         flags = "-cv" if self.debug else "-c"
         subprocess.run(["/usr/sbin/jail",flags,*self.params.jail_params()],
                        check=True)
+        if self.config.proxy:
+            self.add_proxy_route()
 
     @check_running
     def stop(self):

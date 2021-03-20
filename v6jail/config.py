@@ -34,6 +34,7 @@ class HostConfig(IniEncoderMixin):
     bridge:         str = 'bridge0'
     gateway:        str = field(default_factory=host_gateway)
     network:        IPv6Network = None
+    proxy:          bool = False
 
     base:           str = 'base'
     mountpoint:     str = ''
@@ -67,6 +68,7 @@ class JailConfig(IniEncoderMixin):
     bridge:         str
     base:           str
     private:        bool = True
+    proxy:          bool = False
 
 @dataclass
 class DDNSConfig(IniEncoderMixin):

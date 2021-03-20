@@ -54,6 +54,7 @@ class Host:
                           gateway = gateway,
                           bridge = self.config.bridge,
                           base = self.config.base,
+                          proxy = self.config.proxy,
         )
 
     def name_from_hash(self,jail_hash):
