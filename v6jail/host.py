@@ -14,13 +14,17 @@ class Host:
         self.cmd = Command(self.debug)
 
     def generate_addr(self,name):
-        digest = hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
+        digest = hashlib.blake2b(name.encode("utf8"),
+                                      digest_size=8,
+                                      salt=self.config.salt).digest()
         host_address = struct.unpack("L",digest)[0] & int(self.config.network.hostmask) 
         return self.config.network.network_address + host_address
 
     def generate_hash(self,name):
         return base64.b32encode(
-                    hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
+                    hashlib.blake2b(name.encode("utf8"),
+                                    digest_size=8,
+                                    salt=self.config.salt).digest()
                ).lower().rstrip(b"=").decode()
 
     def generate_gateway(self,interface):
@@ -32,7 +36,9 @@ class Host:
             return self.config.gateway
 
     def generate_jail_config(self,name):
-        digest = hashlib.blake2b(name.encode("utf8"),digest_size=8,salt=self.config.salt).digest()
+        digest = hashlib.blake2b(name.encode("utf8"),
+                                 digest_size=8,
+                                 salt=self.config.salt).digest()
         b32_digest = base64.b32encode(digest).lower().rstrip(b"=").decode()
         address = self.generate_addr(name)
         gateway = self.generate_gateway(f"{b32_digest}B")

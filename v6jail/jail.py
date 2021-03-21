@@ -105,7 +105,8 @@ class Jail:
         self.ifconfig(f"{epair}a","name",self.config.epair_host)
         self.ifconfig(f"{epair}b","name",self.config.epair_jail)
         # If bridge has IPv6 address can't configure link-local address
-        self.ifconfig(self.config.epair_host,"inet6","up")
+        self.ifconfig(self.config.epair_host,"inet6","-auto_linklocal","up")
+        self.ifconfig(self.config.epair_jail,"inet6","up")
         if self.config.private:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host,
                                              "private",self.config.epair_host)
@@ -127,20 +128,20 @@ class Jail:
         if fs:
             self.umount_fs(fs)
 
-    def get_lladdr(self):
-        (lladdr_host,) = re.search("inet6 (fe80::.*?)%",self.ifconfig(self.config.epair_host)).groups()
-        lladdr_jail = lladdr_host[:-1] + "b"
-        return (lladdr_host,lladdr_jail)
+    def get_epair_lladdr(self):
+        (lladdr_jail,) = re.search("inet6 (fe80::.*?)%",
+                                   self.ifconfig(self.config.epair_jail)
+                         ).groups()
+        return lladdr_jail
 
-    def add_proxy_route(self):
-        lladdr_host,lladdr_jail = self.get_lladdr()
-        self.route6("add",str(self.config.address),f"{lladdr_jail}%{self.config.epair_host}")
-        try:
-            self.jail_route6("del","default")
-        except Exception as e:
-            print(e)
-        self.jail_route6("add","default",f"{lladdr_host}%{self.config.epair_jail}")
-        self.sysrc(f"ipv6_defaultrouter={lladdr_host}%{self.config.epair_jail}")
+    def get_bridge_ether(self):
+        (bridge_ether,) = re.search("ether (.*)",
+                                   self.ifconfig(self.config.bridge)
+                         ).groups()
+        return bridge_ether
+
+    def add_proxy_route(self,lladdr_jail):
+        self.route6("add",str(self.config.address),f"{lladdr_jail}%{self.config.bridge}")
 
     def is_running(self):
         return self.cmd.check("jls","-Nj",self.config.jname)
@@ -279,10 +280,13 @@ class Jail:
         self.create_epair()
         self.configure_vnet()
         flags = "-cv" if self.debug else "-c"
+        lladdr_jail = self.get_epair_lladdr()
         subprocess.run(["/usr/sbin/jail",flags,*self.params.jail_params()],
                        check=True)
         if self.config.proxy:
-            self.add_proxy_route()
+            self.add_proxy_route(lladdr_jail)
+            self.jexec('/usr/sbin/ndp','-ns',str(self.config.gateway),
+                                             self.get_bridge_ether())
 
     @check_running
     def stop(self):
