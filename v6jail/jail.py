@@ -128,20 +128,34 @@ class Jail:
         if fs:
             self.umount_fs(fs)
 
-    def get_epair_lladdr(self):
-        (lladdr_jail,) = re.search("inet6 (fe80::.*?)%",
-                                   self.ifconfig(self.config.epair_jail)
-                         ).groups()
-        return lladdr_jail
+    def get_lladdr(self,interface,jail=False):
+        (lladdr,) = re.search("inet6 (fe80::.*?)%",
+                              self.jexec('/sbin/ifconfig',interface) if jail else self.ifconfig(interface)
+                    ).groups()
+        return lladdr
 
-    def get_bridge_ether(self):
-        (bridge_ether,) = re.search("ether (.*)",
-                                   self.ifconfig(self.config.bridge)
-                         ).groups()
-        return bridge_ether
+    def get_ether(self,interface):
+        (ether,) = re.search("ether (.*)",
+                             self.ifconfig(interface)
+                   ).groups()
+        return ether
 
-    def add_proxy_route(self,lladdr_jail):
+    def get_gateway(self,address):
+        (gateway,) = re.search("gateway: (.*)",
+                               self.route6("get",address)
+                     ).groups()
+        return gateway
+
+    def add_proxy_route(self,lladdr_jail,ether_jail):
         self.route6("add",str(self.config.address),f"{lladdr_jail}%{self.config.bridge}")
+        self.cmd('/usr/sbin/ndp','-ns',f"{lladdr_jail}%{self.config.bridge}",ether_jail)
+        self.jexec('/usr/sbin/ndp','-ns',str(self.config.gateway),
+                                         self.get_ether(self.config.bridge))
+
+    def delete_proxy_route(self):
+        gw = self.get_gateway(str(self.config.address))
+        self.route6("delete",str(self.config.address))
+        self.cmd('/usr/sbin/ndp','-nd',gw)
 
     def is_running(self):
         return self.cmd.check("jls","-Nj",self.config.jname)
@@ -280,13 +294,12 @@ class Jail:
         self.create_epair()
         self.configure_vnet()
         flags = "-cv" if self.debug else "-c"
-        lladdr_jail = self.get_epair_lladdr()
+        lladdr_jail = self.get_lladdr(self.config.epair_jail)
+        ether_jail = self.get_ether(self.config.epair_jail)
         subprocess.run(["/usr/sbin/jail",flags,*self.params.jail_params()],
                        check=True)
         if self.config.proxy:
-            self.add_proxy_route(lladdr_jail)
-            self.jexec('/usr/sbin/ndp','-ns',str(self.config.gateway),
-                                             self.get_bridge_ether())
+            self.add_proxy_route(lladdr_jail,ether_jail)
 
     @check_running
     def stop(self):
@@ -296,6 +309,8 @@ class Jail:
         self.jail_stop()
         self.umount_devfs()
         self.force_umount()
+        if self.config.proxy:
+            self.delete_proxy_route()
 
     @check_fs_exists
     def destroy_fs(self):
