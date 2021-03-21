@@ -25,7 +25,7 @@ def cli(ctx,debug,base,config):
             try:
                 with open(DEFAULT_CONFIG) as config:
                     host_config = HostConfig.read_config("host",f=config)
-            except FileNotFoundError:
+            except (FileNotFoundError,KeyError):
                 # Try to guess config
                 host_config = HostConfig()
         ctx.obj["host"] = Host(host_config,debug)
