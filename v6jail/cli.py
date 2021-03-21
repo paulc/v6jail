@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import code,shlex,subprocess,sys
+import binascii,code,shlex,subprocess,sys
 import click,tabulate
 
 from .host import Host
@@ -8,6 +8,8 @@ from .jail import Jail
 from .config import HostConfig,JailConfig
 
 proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
+
+DEFAULT_CONFIG = "/usr/local/etc/v6jail.ini"
 
 @click.group()
 @click.option("--debug",is_flag=True)
@@ -20,9 +22,11 @@ def cli(ctx,debug,base,config):
         if config:
             host_config = HostConfig.read_config("host",f=config)
         else:
-            if base:
-                host_config = HostConfig(base=base)
-            else:
+            try:
+                with open(DEFAULT_CONFIG) as f:
+                    host_config = HostConfig.read_config("host",f)
+            except FileNotFoundError:
+                # Try to guess config
                 host_config = HostConfig()
         ctx.obj["host"] = Host(host_config,debug)
     except subprocess.CalledProcessError as e:
@@ -31,13 +35,34 @@ def cli(ctx,debug,base,config):
         raise click.ClickException(f"{e}")
 
 @cli.command()
-@click.option("--dump","option",flag_value="hostconfig")
+@click.option("--zvol")
+@click.option("--bridge")
+@click.option("--gateway")
+@click.option("--network")
+@click.option("--proxy",type=bool)
+@click.option("--base")
+@click.option("--mountpoint")
+@click.option("--salt")
 @click.pass_context
-def config(ctx,option):
-    if option == "hostconfig":
-        ctx.obj["host"].config.write_config("host").write(sys.stdout)
-
-
+def config(ctx,zvol,bridge,gateway,network,proxy,base,mountpoint,salt):
+    config = ctx.obj["host"].config
+    if zvol:
+        config.zvol = zvol
+    if bridge:
+        config.bridge = bridge
+    if gateway:
+        config.gateway = gateway
+    if network:
+        config.network = network
+    if proxy:
+        config.proxy = proxy
+    if base:
+        config.base = base
+    if mountpoint:
+        config.mountpoint = mountpoint
+    if salt:
+        config.salt = binascii.unhexlify(salt)
+    config.write_config("host").write(sys.stdout)
 
 @cli.command()
 @click.argument("name",nargs=1)
