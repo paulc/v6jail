@@ -23,8 +23,8 @@ def cli(ctx,debug,base,config):
             host_config = HostConfig.read_config("host",f=config)
         else:
             try:
-                with open(DEFAULT_CONFIG) as f:
-                    host_config = HostConfig.read_config("host",f)
+                with open(DEFAULT_CONFIG) as config:
+                    host_config = HostConfig.read_config("host",f=config)
             except FileNotFoundError:
                 # Try to guess config
                 host_config = HostConfig()
