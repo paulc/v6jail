@@ -6,6 +6,7 @@ import click,tabulate
 from .host import Host
 from .jail import Jail
 from .config import HostConfig,JailConfig
+from .ddns import DDNSConfig
 
 proc_err = lambda e: e.stderr.strip().decode() if e.stderr else ''
 
@@ -14,9 +15,10 @@ DEFAULT_CONFIG = "/usr/local/etc/v6jail.ini"
 @click.group()
 @click.option("--debug",is_flag=True)
 @click.option("--config",type=click.File("r"))
+@click.option("--ddns",type=click.File("r"))
 @click.option("--base")
 @click.pass_context
-def cli(ctx,debug,base,config):
+def cli(ctx,debug,base,config,ddns):
     try:
         ctx.ensure_object(dict)
         if config:
@@ -28,7 +30,17 @@ def cli(ctx,debug,base,config):
             except (FileNotFoundError,KeyError):
                 # Try to guess config
                 host_config = HostConfig()
+        if ddns:
+            ddns_config = DDNSConfig.read_config("ddns",f=ddns)
+        else:
+            try:
+                with open(DEFAULT_CONFIG) as ddns:
+                    ddns_config = DDNSConfig.read_config("ddns",f=ddns)
+            except (FileNotFoundError,KeyError):
+                # Try to guess config
+                ddns_config = DDNSConfig()
         ctx.obj["host"] = Host(host_config,debug)
+        ctx.obj["ddns"] = ddns_config
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
@@ -126,11 +138,12 @@ def fromconfig(ctx,jail_config):
 @click.option("--force-ndp",is_flag=True)
 @click.option("--jexec")
 @click.option("--fastboot",is_flag=True)
+@click.option("--ddns",is_flag=True)
 @click.option("--fastboot-service",multiple=True)
 @click.option("--fastboot-cmd",multiple=True)
 @click.option("--adduser",nargs=2,multiple=True)
 @click.pass_context
-def run(ctx,name,jail_params,linux,fastboot,force_ndp,
+def run(ctx,name,jail_params,linux,fastboot,force_ndp,ddns,
             fastboot_service,fastboot_cmd,adduser,shell,jexec):
     try:
         jail = ctx.obj["host"].jail(name)
@@ -152,6 +165,8 @@ def run(ctx,name,jail_params,linux,fastboot,force_ndp,
                     do ping6 -o {jail.config.gateway} >/dev/null 2>&1 && break; 
                     sleep 1; 
                 done &''')
+        if ddns:
+            ctx.obj["ddns"].update(f"add {name} AAAA {jail.config.address}")
         if jexec:
             jail.jexec(*shlex.split(jexec))
         if shell:

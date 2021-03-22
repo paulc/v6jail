@@ -249,6 +249,7 @@ class Jail:
         cmds = ";\n".join([*services,*cmds])
         return f"""\
             ifconfig lo0 inet6 up;
+            ifconfig lo0 inet 127.0.0.1;
             ifconfig {self.config.epair_jail} inet6 {self.config.address} prefixlen {self.config.prefixlen} auto_linklocal;
             route -6 add default {self.config.gateway};
             route -6 add fe80:: -prefixlen 10 ::1 -reject;
