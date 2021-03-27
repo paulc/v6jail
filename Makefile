@@ -9,7 +9,7 @@ bin/v6: ${SOURCES}
 	@/usr/bin/env shiv --python '/usr/local/bin/python3 -sE' \
 		  --compile-pyc \
 		  --compressed \
-		  --preamble ./preamble.py \
+		  --preamble ./shiv/preamble.py \
 		  --entry-point v6jail.cli:cli \
 		  --output-file bin/v6 \
 		  .
@@ -20,4 +20,7 @@ ifeq ($(UPLOAD),)
 	$(error Must specify variable UPLOAD=<rsync destination>)
 endif
 	rsync -av bin/v6 ${UPLOAD} 
+
+clean:
+	rm -f bin/* dist/* v6jail/__pycache__/*
 
