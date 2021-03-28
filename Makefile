@@ -22,5 +22,5 @@ endif
 	rsync -av bin/v6 ${UPLOAD} 
 
 clean:
-	rm -f bin/* dist/* v6jail/__pycache__/*
+	rm -f ./bin/* ./dist/* ./v6jail/__pycache__/* ./v6jail.egg-info/*
 

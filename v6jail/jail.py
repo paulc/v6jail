@@ -244,7 +244,7 @@ class Jail:
             os.chmod(f"{self.config.path}/home/{user}/.ssh/authorized_keys",0o600)
 
     def fastboot_script(self,services=None,cmds=None):
-        services = [f"service {s} start" for s in (services or ["syslogd","cron","sshd"])]
+        services = [f"service {s} start" for s in services]
         cmds = cmds or []
         cmds = ";\n".join([*services,*cmds])
         return f"""\
@@ -256,7 +256,7 @@ class Jail:
             route -6 add ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject;
             route -6 add ::0.0.0.0 -prefixlen 96 ::1 -reject; 
             route -6 add ff02:: -prefixlen 16 ::1 -reject; 
-            uname -a > /etc/motd
+            uname -a > /etc/motd;
             [ -f /etc/fstab ] && mount -al;
             {cmds}
         """

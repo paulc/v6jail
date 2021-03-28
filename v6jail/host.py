@@ -99,6 +99,20 @@ class Host:
         if snapshot:
             self.snapshot_base()
 
+    def clone_base(self,name):
+        source = self.get_latest_snapshot()
+        dest = f"{self.config.zvol}/{name}"
+        with subprocess.Popen(["/sbin/zfs","send",source],
+                              stdout=subprocess.PIPE) as send:
+            with subprocess.Popen(["/sbin/zfs","recv","-v",dest],
+                                  stdin=send.stdout) as recv:
+                if recv.wait() != 0:
+                    send.kill()
+                    raise ValueError("ZFS recv failed")
+                else:
+                    if send.wait() != 0:
+                        raise ValueError("ZFS send failed")
+
     def list_jails(self,status=False):
         out = self.cmd("/sbin/zfs","list","-r","-H","-o","name,jail:name,jail:base,jail:ipv6",
                     "-s","jail:name", self.config.zvol)
