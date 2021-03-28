@@ -149,8 +149,7 @@ class Jail:
     def add_proxy_route(self,lladdr_jail,ether_jail):
         self.route6("add",str(self.config.address),f"{lladdr_jail}%{self.config.bridge}")
         #self.cmd('/usr/sbin/ndp','-ns',f"{lladdr_jail}%{self.config.bridge}",ether_jail)
-        #self.jexec('/usr/sbin/ndp','-ns',str(self.config.gateway),
-                                         self.get_ether(self.config.bridge))
+        #self.jexec('/usr/sbin/ndp','-ns',str(self.config.gateway),self.get_ether(self.config.bridge))
 
     def delete_proxy_route(self):
         gw = self.get_gateway(str(self.config.address))
