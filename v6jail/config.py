@@ -66,4 +66,5 @@ class JailConfig(IniEncoderMixin):
     base:           str
     private:        bool = True
     proxy:          bool = False
+    bpf_rule:       int = 10
 
