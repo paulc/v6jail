@@ -74,7 +74,7 @@ class Host:
         raise ValueError(f"ZFS volume not found: {self.config.zvol}/{jail_hash}")
 
     def get_latest_snapshot(self):
-        out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-s", "creation", "-o", "name", 
+        out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-d", "1", "-s", "creation", "-o", "name", 
                               f"{self.config.zvol}/{self.config.base}")
         if out:
             return out.split("\n")[-1]

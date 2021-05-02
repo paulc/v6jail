@@ -78,7 +78,7 @@ class Jail:
         dest.chmod(mode)
 
     def get_latest_snapshot(self):
-        out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-s", "creation", "-o", "name", 
+        out = self.cmd("/sbin/zfs", "list", "-Hrt", "snap", "-d", "1", "-s", "creation", "-o", "name", 
                               f"{self.config.base_zvol}")
         if out:
             return out.split("\n")[-1]
@@ -106,7 +106,7 @@ class Jail:
         self.ifconfig(f"{epair}b","name",self.config.epair_jail)
         # If bridge has IPv6 address can't configure link-local address
         self.ifconfig(self.config.epair_host,"inet6","-auto_linklocal","up")
-        self.ifconfig(self.config.epair_jail,"inet6","up")
+        self.ifconfig(self.config.epair_jail,"inet6","auto_linklocal","-ifdisabled","up")
         if self.config.private:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host,
                                              "private",self.config.epair_host)
