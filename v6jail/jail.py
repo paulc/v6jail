@@ -57,11 +57,13 @@ class Jail:
         self.zfs_clone      = lambda *args: self.cmd("/sbin/zfs","clone",*args)
         self.zfs_set        = lambda *args: self.cmd("/sbin/zfs","set",*args,self.config.zpath)
         self.jail_start     = lambda *args: self.cmd("/usr/sbin/jail","-cv",*args)
+        self.jail_stop      = lambda : self.cmd("/usr/sbin/jail","-Rv",self.config.jname)
         self.useradd        = lambda user:  self.cmd("/usr/sbin/pw","-R",self.config.path,
                                                 "useradd","-n",user,"-m","-s","/bin/sh","-h","-")
         self.usershow       = lambda user:  self.cmd("/usr/sbin/pw","-R",self.config.path,
                                                 "usershow","-n",user).split(":")
-        self.jail_stop      = lambda : self.cmd("/usr/sbin/jail","-Rv",self.config.jname)
+        self.usermod        = lambda user,*args: self.cmd("/usr/sbin/pw","-R",self.config.path,
+                                                "usermod","-n",user,*args)
         self.umount_devfs   = lambda : self.cmd("/sbin/umount",f"{self.config.path}/dev")
         self.osrelease      = lambda : self.cmd("/usr/bin/uname","-r")
         self.mounted_fs     = lambda : self.cmd("/sbin/mount")

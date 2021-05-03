@@ -147,10 +147,11 @@ def fromconfig(ctx,jail_config):
 @click.option("--fastboot-service",multiple=True,default=["syslogd","cron","sshd"])
 @click.option("--fastboot-cmd",multiple=True)
 @click.option("--adduser",nargs=2,multiple=True)
+@click.option("--wheel",is_flag=True)
 @click.option("--ddns",is_flag=True)
 @click.pass_context
 def run(ctx,name,jail_params,linux,fastboot,force_ndp,ddns,persist,
-            fastboot_service,fastboot_cmd,adduser,shell,jexec,destroy):
+            fastboot_service,fastboot_cmd,adduser,wheel,shell,jexec,destroy):
     try:
         if name == '__uuid__':
             name = str(uuid.uuid4())
@@ -161,6 +162,8 @@ def run(ctx,name,jail_params,linux,fastboot,force_ndp,ddns,persist,
             raise click.UsageError(f"Jail {name} running")
         for (user,pk) in adduser:
             jail.adduser(user=user,pk=pk)
+            if wheel:
+                jail.usermod(user,"-G","wheel")
         if not persist:
             jail_params = [*jail_params,"persist=false"]
             fastboot_service = []
