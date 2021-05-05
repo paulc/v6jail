@@ -42,10 +42,11 @@ class Host:
         b32_digest = base64.b32encode(digest).lower().rstrip(b"=").decode()
         address = self.generate_addr(name)
         gateway = self.generate_gateway(f"{b32_digest}B")
-        if '%' in gateway:
-            prefixlen = 128
-        else:
-            prefixlen = self.config.network.prefixlen
+        #if '%' in gateway:
+        #    prefixlen = 128
+        #else:
+        #    prefixlen = self.config.network.prefixlen
+        prefixlen = self.config.network.prefixlen
 
         return JailConfig(name = name,
                           hash = b32_digest,
