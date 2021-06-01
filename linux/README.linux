@@ -5,13 +5,15 @@ sysrc linux_enable=YES
 sysrc linux_mounts_enable="NO"
 service linux start
 
+# Make sure fs modules loaded
+kldload -n tmpfs.ko nullfs.ko fdescfs.ko linprocfs.ko linsysfs.ko
+
 # Configure linux base
 
-LATEST_SNAPSHOT=$(zfs list -Hrt snap -o name -s creation zroot/jail/base | tail -1)
+v6 update-base
+v6 clone-base linux
 
-zfs send ${LATEST_SNAPSHOT} | zfs recv -v zroot/jail/linux
-
-python3 -mv6jail.cli --base linux chroot-base --snapshot <<EOM
+v6 --base linux chroot-base --snapshot <<EOM
 
 tee /etc/fstab <<__FSTAB
 devfs           /compat/ubuntu/dev      devfs           rw,late                      0       0
@@ -30,12 +32,11 @@ mount -al
 
 pkg install -y debootstrap
 
-debootstrap --no-check-gpg bionic /compat/ubuntu
-echo "APT::Cache-Start 251658240;" | tee /compat/ubuntu/etc/apt/apt.conf.d/00aptitude
+debootstrap bionic /compat/ubuntu
 
+chroot /compat/ubuntu /usr/bin/apt remove -y rsyslog
 chroot /compat/ubuntu /usr/bin/apt update
 chroot /compat/ubuntu /usr/bin/apt install -y openssh-server
-chroot /compat/ubuntu /usr/bin/apt remove -y rsyslog
 
 sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
 
@@ -43,7 +44,7 @@ umount -a
 
 EOM
 
-# Sync linux users
+# sync linux users
 for (user,_) in adduser:
     if user != "root":
         uid = jail.jexec("id","-u",user,capture=True,check=True).stdout.strip().decode()

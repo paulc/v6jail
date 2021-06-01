@@ -115,6 +115,7 @@ class JailParam(UserDict):
         return {
             'devfs_ruleset':            20,
             'linux':                    'new',
+            'enforce_statfs':           1,
             'allow.mount.devfs':        True,
             'allow.mount.fdescfs':      True,
             'allow.mount.linprocfs':    True,
