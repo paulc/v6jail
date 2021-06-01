@@ -103,6 +103,7 @@ class JailParam(UserDict):
         return {
             'allow.set_hostname':       False,
             'mount.devfs':              True,
+            'linux':                    'disable',
             'devfs_ruleset':            4,
             'enforce_statfs':           2,
             'children.max':             0,
@@ -116,6 +117,7 @@ class JailParam(UserDict):
             'devfs_ruleset':            20,
             'linux':                    'new',
             'enforce_statfs':           1,
+            'allow.mount':              True,
             'allow.mount.devfs':        True,
             'allow.mount.fdescfs':      True,
             'allow.mount.linprocfs':    True,
