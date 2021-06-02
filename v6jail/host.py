@@ -13,9 +13,9 @@ class Host:
         self.debug = debug
         self.cmd = Command(self.debug)
         try:
-            self.cmd('/sbin/zfs', 'list', '-Ho', 'name', f'{host.config.zvol}/{host.config.base}')
+            self.cmd('/sbin/zfs', 'list', '-Ho', 'name', f'{self.config.zvol}/{self.config.base}')
         except subprocess.CalledProcessError as e:
-            raise ValueError('Invalid base: {host.config.base}')
+            raise ValueError('Invalid base: {self.config.base}')
 
     def generate_addr(self,name):
         digest = hashlib.blake2b(name.encode("utf8"),
