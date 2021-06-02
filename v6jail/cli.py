@@ -30,6 +30,8 @@ def cli(ctx,debug,base,config,ddns):
             except (FileNotFoundError,KeyError):
                 # Try to guess config
                 host_config = HostConfig()
+        if base:
+            host_config.base = base
         if ddns:
             ddns_config = DDNSConfig.read_config("ddns",f=ddns)
         else:
