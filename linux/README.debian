@@ -1,0 +1,58 @@
+
+# Host config
+
+sysrc linux_enable=YES
+sysrc linux_mounts_enable="NO"
+service linux start
+
+# Make sure fs modules loaded
+kldload -n tmpfs.ko nullfs.ko fdescfs.ko linprocfs.ko linsysfs.ko
+
+# Configure linux base
+
+v6 update-base
+v6 clone-base debian
+
+v6 --base debian chroot-base --snapshot <<EOM
+
+tee /etc/fstab <<__FSTAB
+tmpfs           /compat/debian/dev/shm  tmpfs           rw,late,size=256m,mode=1777  0       0
+fdescfs         /compat/debian/dev/fd   fdescfs         rw,late,linrdlnk             0       0
+devfs           /compat/debian/dev      devfs           rw,late                      0       0
+linprocfs       /compat/debian/proc     linprocfs       rw,late                      0       0
+linsysfs        /compat/debian/sys      linsysfs        rw,late                      0       0
+/tmp            /compat/debian/tmp      nullfs          rw,late                      0       0
+/home           /compat/debian/home     nullfs          rw,late                      0       0
+__FSTAB
+
+mkdir -p /home /compat/debian
+( cd /compat/debian; mkdir -p dev dev/fd dev/shm proc sys tmp home )
+mount -al
+
+pkg install -y debootstrap
+
+debootstrap stable /compat/debian
+
+chroot /compat/debian /usr/bin/apt update
+chroot /compat/debian /usr/bin/apt install -y openssh-server sudo 
+printf 'g/^%%sudo/s/ALL\$/NOPASSWD:ALL/\nwq\n' | chroot /compat/debian /usr/bin/env EDITOR=ex visudo
+
+rm /compat/debian/etc/ssh/ssh_host*key*
+
+sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
+
+umount -a
+EOM
+
+# Create jail
+
+USER=
+PK=
+NAME=
+
+v6 --base debian run --fastboot --adduser "${USER}" "${PK}" --linux --shell "${NAME}" <<EOM
+chroot /compat/debian /usr/sbin/adduser --no-create-home --disabled-password --gecos "" --uid \$(id -u "${USER}") --ingroup sudo "${USER}"
+chroot /compat/debian /usr/bin/ssh-keygen -A
+chroot /compat/debian /usr/sbin/service ssh start
+EOM
+

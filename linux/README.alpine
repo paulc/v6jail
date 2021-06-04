@@ -49,10 +49,11 @@ EOM
 
 # To boot linux (with user)
 
-USER=<user>
-PK=<pk>
+export USER=<user>
+export PK=<pk>
+export NAME=<name>
 
-python3 -mv6jail.cli --base alpine run --fastboot --adduser "${USER}" "${PK}" --linux --shell <name> <<EOM
+python3 -mv6jail.cli --base alpine run --fastboot --adduser "${USER}" "${PK}" --linux --shell "${NAME}" <<EOM
 chroot /compat/alpine /usr/sbin/addgroup --gid $(id -g "${USER}") "${USER}"
 chroot /compat/alpine /usr/sbin/adduser --no-create-home --disabled-password --ingroup wheel --uid $(id -u "${USER}") "${USER}" "${USER}"
 chroot /compat/alpine /sbin/rc-service sshd start
