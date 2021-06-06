@@ -376,6 +376,19 @@ def clone_base(ctx,name):
     except ValueError as e:
         raise click.ClickException(f"{e}")
 
+@cli.command()
+@click.argument("name",nargs=1)
+@click.option("--add","operation",flag_value="add",default=True)
+@click.option("--del","operation",flag_value="del")
+@click.option("--record")
+@click.pass_context
+def ddns(name,operation,record):
+    jail = ctx.obj["host"].jail(name)
+    if record:
+        ctx.obj["ddns"].update(f"{operation} {name} {record}")
+    else:
+        ctx.obj["ddns"].update(f"{operation} {name} AAAA {jail.config.address}")
+
 if __name__ == "__main__":
     cli()
 
