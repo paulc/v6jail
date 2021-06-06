@@ -38,6 +38,7 @@ chroot /compat/debian /usr/bin/apt install -y openssh-server sudo
 printf 'g/^%%sudo/s/ALL\$/NOPASSWD:ALL/\nwq\n' | chroot /compat/debian /usr/bin/env EDITOR=ex visudo
 
 rm /compat/debian/etc/ssh/ssh_host*key*
+cp /etc/resolv.conf /compat/debian/etc/resolv.conf
 
 sysrc sshd_flags="$(sysrc -n sshd_flags) -o Port=5022"
 
@@ -56,3 +57,6 @@ chroot /compat/debian /usr/bin/ssh-keygen -A
 chroot /compat/debian /usr/sbin/service ssh start
 EOM
 
+# Run 
+
+v6 start --linux --fastboot --fastboot-cmd 'chroot /compat/debian /usr/sbin/service ssh start' "${NAME}"

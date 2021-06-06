@@ -273,10 +273,14 @@ def list(ctx,status):
 @click.argument("name",nargs=1)
 @click.option("--user",required=True)
 @click.option("--pk",required=True)
+@click.option("--wheel",is_flag=True)
 @click.pass_context
-def adduser(ctx,name,user,pk):
+def adduser(ctx,name,user,pk,wheel):
     try:
-        ctx.obj["host"].jail(name).adduser(user=user,pk=pk)
+        jail = ctx.obj["host"].jail(name)
+        jail.adduser(user=user,pk=pk)
+        if wheel:
+            jail.usermod(user,"-G","wheel")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
     except ValueError as e:
