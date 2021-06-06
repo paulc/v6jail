@@ -382,7 +382,7 @@ def clone_base(ctx,name):
 @click.option("--del","operation",flag_value="del")
 @click.option("--record")
 @click.pass_context
-def ddns(name,operation,record):
+def ddns(ctx,name,operation,record):
     jail = ctx.obj["host"].jail(name)
     if record:
         ctx.obj["ddns"].update(f"{operation} {name} {record}")
