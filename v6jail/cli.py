@@ -384,8 +384,12 @@ def clone_base(ctx,name):
 @click.pass_context
 def ddns(ctx,name,operation,record):
     jail = ctx.obj["host"].jail(name)
-    if record is None:
-        record = f"AAAA {jail.config.address}"
+    if operation == 'add':
+        if record is None:
+            record = f"AAAA {jail.config.address}"
+    elif operation == 'del':
+        if record is None:
+            record = ""
     ctx.obj["ddns"].update(f"{operation} {name} {record}")
 
 if __name__ == "__main__":
