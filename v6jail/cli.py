@@ -198,6 +198,8 @@ def run(ctx,name,jail_params,linux,fastboot,force_ndp,ddns,persist,
         else:
             if destroy:
                 jail.remove()
+                if ddns:
+                    ctx.obj["ddns"].update(f"del {name}")
                 click.secho(f"Removed jail: {jail.config.name} ({jail.config.jname})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
@@ -245,12 +247,15 @@ def stop(ctx,name):
 
 @cli.command()
 @click.option("--force",is_flag=True)
+@click.option("--ddns",is_flag=True)
 @click.argument("name",nargs=1)
 @click.pass_context
-def destroy(ctx,name,force):
+def destroy(ctx,name,force,ddns):
     try:
         jail = ctx.obj["host"].jail(name)
         jail.remove(force=force)
+        if ddns:
+            ctx.obj["ddns"].update(f"del {name}")
         click.secho(f"Removed jail: {jail.config.name} ({jail.config.jname})",fg="green")
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
@@ -324,6 +329,7 @@ def repl(ctx,name):
         if name:
             jail = ctx.obj["host"].jail(name[0])
         host = ctx.obj["host"]
+        ddns = ctx.obj["ddns"]
         code.interact(local=locals())
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"{e} :: {proc_err(e)}")
