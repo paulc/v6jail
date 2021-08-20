@@ -10,8 +10,7 @@ setup(name='v6jail',
       packages = ['v6jail'],
       license = 'BSD',
       author = "paulc",
-      author_email = "https://github.com/paulc",
-      classifiers = [ "Operating System :: POSIX :: BSD :: FreeBSD"
+      classifiers = [ "Operating System :: POSIX :: BSD :: FreeBSD",
                       "Programming Language :: Python :: 3",
       ],
      )
