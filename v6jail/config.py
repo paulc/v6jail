@@ -19,6 +19,11 @@ def bridge_ipv6(bridge_if):
                         cmd('/sbin/ifconfig',bridge_if,'inet6')).groups()
     return IPv6Network(f'{ipv6}/{prefixlen}',strict=False)
 
+def bridge_mtu(bridge_if):
+    (mtu,) = re.search('mtu (\d+)',
+                        cmd('/sbin/ifconfig',bridge_if,'inet6')).groups()
+    return int(mtu)
+
 def host_gateway():
     (gateway,) = re.search('gateway: (.*)',
                            cmd('/sbin/route','-6','get','default')).groups()
@@ -29,6 +34,7 @@ class HostConfig(IniEncoderMixin):
 
     zvol:           str = 'zroot/jail'
     bridge:         str = 'bridge0'
+    mtu:            int = 1500
     gateway:        str = field(default_factory=host_gateway)
     network:        IPv6Network = None
     proxy:          bool = False
@@ -45,6 +51,7 @@ class HostConfig(IniEncoderMixin):
         if not cmd.check("/sbin/ifconfig",self.bridge):
             raise ValueError(f"bridge not found: {self.bridge}")
 
+        self.mtu = bridge_mtu(self.bridge)
         self.network = self.network or bridge_ipv6(self.bridge)
         self.mountpoint = self.mountpoint or cmd("/sbin/zfs","list","-H","-o","mountpoint",self.zvol)
 
@@ -63,6 +70,7 @@ class JailConfig(IniEncoderMixin):
     epair_jail:     str
     gateway:        str
     bridge:         str
+    mtu:            int
     base:           str
     private:        bool = True
     proxy:          bool = False

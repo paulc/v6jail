@@ -107,8 +107,8 @@ class Jail:
         self.ifconfig(f"{epair}a","name",self.config.epair_host)
         self.ifconfig(f"{epair}b","name",self.config.epair_jail)
         # If bridge has IPv6 address can't configure link-local address
-        self.ifconfig(self.config.epair_host,"inet6","-auto_linklocal","up")
-        self.ifconfig(self.config.epair_jail,"inet6","auto_linklocal","-ifdisabled","up")
+        self.ifconfig(self.config.epair_host,"inet6","-auto_linklocal","mtu",str(self.config.mtu),"up")
+        self.ifconfig(self.config.epair_jail,"inet6","auto_linklocal","-ifdisabled",str(self.config.mtu),"up")
         if self.config.private:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host,
                                              "private",self.config.epair_host)

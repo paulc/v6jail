@@ -64,6 +64,7 @@ class Host:
                           epair_jail = f"{b32_digest}B",
                           gateway = gateway,
                           bridge = self.config.bridge,
+                          mtu = self.config.mtu,
                           base = self.config.base,
                           proxy = self.config.proxy,
         )
