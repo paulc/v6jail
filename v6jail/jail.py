@@ -287,7 +287,7 @@ class Jail:
         self.sysrc(f"network_interfaces=lo0 {self.config.epair_jail}",
                    f"ifconfig_{self.config.epair_jail}_ipv6=inet6 {self.config.address}/{self.config.prefixlen}",
                    f"ipv6_defaultrouter={self.config.gateway}",
-                   f"ifconfig_lo0=up",
+                   f"ifconfig_lo0=inet 127.0.0.1 up",
                    f"ifconfig_lo0_ipv6=inet6 up")
 
     @check_fs_exists
