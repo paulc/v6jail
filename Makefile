@@ -6,6 +6,7 @@ $(info $(SOURCES))
 shiv: bin/v6
 
 bin/v6: ${SOURCES}
+	@/bin/mkdir -p bin
 	@/usr/bin/env shiv --python '/usr/local/bin/python3 -sE' \
 		  --compile-pyc \
 		  --compressed \
