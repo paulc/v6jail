@@ -40,3 +40,9 @@ class Command:
         except subprocess.CalledProcessError:
             return False
 
+    def nocheck(self,*args):
+        try:
+            self.cmd(*args)
+        except subprocess.CalledProcessError:
+            pass
+

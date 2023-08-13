@@ -51,6 +51,7 @@ class Jail:
 
         # Useful commands
         self.ifconfig       = lambda *args: self.cmd("/sbin/ifconfig",*args)
+        self.try_ifconfig   = lambda *args: self.cmd.nocheck("/sbin/ifconfig",*args)
         self.route6         = lambda *args: self.cmd("/sbin/route","-6",*args)
         self.jail_route6    = lambda *args: self.cmd("/usr/sbin/jexec",
                                                 "-l",self.config.jname,"/sbin/route","-6",*args)
@@ -116,10 +117,10 @@ class Jail:
             self.ifconfig(self.config.bridge,"addm",self.config.epair_host)
 
     def destroy_epair(self):
-        self.ifconfig(self.config.epair_host,"destroy")
+        self.try_ifconfig(self.config.epair_host,"destroy")
 
     def remove_vnet(self):
-        self.ifconfig(self.config.epair_jail,"-vnet",self.config.jname)
+        self.try_ifconfig(self.config.epair_jail,"-vnet",self.config.jname)
 
     def umount_local(self):
         if os.path.exists(f"{self.config.path}/etc/fstab"):
